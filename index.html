@@ -74,6 +74,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 .listen-pad.has-yt .l-head{padding:5px 8px;font-size:14px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:6px}
 .yt-seek{border:1px solid rgba(37,99,235,.25);background:var(--card);color:var(--ac);font-size:12px;font-weight:700;padding:4px 9px;border-radius:8px;line-height:1.2}
 .l-opts{flex:2;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px}
+.l-opts.three button:nth-child(3){grid-column:1 / -1;width:calc(50% - 4px);justify-self:center}
 .l-opts button{height:100%;font-size:32px;font-weight:800;border:2px solid var(--bd);border-radius:14px;background:var(--card);color:var(--tx);box-shadow:var(--sh)}
 .listen-pad.has-yt .l-opts{gap:6px}
 .listen-pad.has-yt .l-opts button{font-size:24px;border-radius:12px}
@@ -159,6 +160,12 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 .yt-spd{display:inline-flex;gap:4px;margin-left:auto}
 .yt-spd button{padding:3px 7px;font-size:11px;border-radius:6px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-weight:700}
 .yt-spd button.sel{background:var(--ac);border-color:var(--ac);color:var(--acx)}
+.chip.add-q{background:var(--ac-soft);color:var(--ac);border:1px dashed var(--ac);font-weight:800;min-width:32px}
+#exam{position:relative}
+#exam.is-paused .main,#exam.is-paused .dock,#exam.is-paused .lmode-bar,#exam.is-paused .yt-top{filter:blur(12px);pointer-events:none;user-select:none}
+#exam.is-paused #nextBtn{pointer-events:none;opacity:.5}
+.pause-ov{position:absolute;inset:52px 0 0 0;z-index:30;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.35);backdrop-filter:blur(4px)}
+.pause-box{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:24px;max-width:340px;width:100%;text-align:center;box-shadow:0 16px 40px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
@@ -313,6 +320,14 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
       <button class="nav" id="nextQ">▶</button>
     </div>
   </div>
+  <div id="pauseOverlay" class="pause-ov hide">
+    <div class="pause-box">
+      <div style="font-size:32px;line-height:1">⏸</div>
+      <h2 style="margin:8px 0 4px;font-size:20px">Exam Paused</h2>
+      <div class="mu">Question ও Answer লক করা আছে।</div>
+      <button type="button" class="btn" id="resumeOverlayBtn" style="margin-top:16px">▶ Resume to Continue</button>
+    </div>
+  </div>
 </div>
 
 <div id="report" class="wrap hide" style="max-width:760px">
@@ -380,13 +395,32 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 const $=id=>document.getElementById(id);
 const LISTEN_MONDAI=[{m:1,q:7,opts:4},{m:2,q:6,opts:4},{m:3,q:5,opts:3},{m:4,q:6,opts:3}];
 const LISTEN_TOTAL=LISTEN_MONDAI.reduce((s,x)=>s+x.q,0);
-function listenInfo(q){
+const cloneMondai=()=>LISTEN_MONDAI.map(x=>({...x}));
+const partMondai=P=>(P&&Array.isArray(P.mondai)&&P.mondai.length===4)?P.mondai:LISTEN_MONDAI;
+function listenInfo(q,P){
+  const list=partMondai(P||cfg?.parts?.[part]);
   let off=0;
-  for(const md of LISTEN_MONDAI){
+  for(const md of list){
     if(q<=off+md.q)return{m:md.m,num:q-off,opts:md.opts};
     off+=md.q;
   }
-  return{m:4,num:q-18,opts:3};
+  const last=list[list.length-1];
+  return{m:last.m,num:Math.max(1,q-off+last.q),opts:last.opts};
+}
+function effectiveCount(A,M,maxQ){
+  let last=0;
+  for(let q=1;q<=maxQ;q++)if((A&&A[q])||(M&&M[q]))last=q;
+  return last;
+}
+function effectiveMondai(P,A,M){
+  let off=0;
+  return partMondai(P).map(md=>{
+    let last=0;
+    for(let j=1;j<=md.q;j++)if((A&&A[off+j])||(M&&M[off+j]))last=j;
+    const item={m:md.m,q:md.q,opts:md.opts,effQ:last,off};
+    off+=md.q;
+    return item;
+  });
 }
 let pdf=null,cfg,part=0,ans=[],marks=[],used=[],endAt=0,tick=null,limit=0;
 
@@ -587,7 +621,7 @@ $('onlyListenBtn').onclick=async()=>{
       pages=Array.from({length:pdf.numPages},(_,k)=>k+1);
     }catch(e){$('err').textContent='PDF load হয়নি: '+e.message;$('onlyListenBtn').textContent='Start Only Listening';return}
   }
-  beginExam(name,f?'':driveId,[{label:'Listening',listen:true,pages,q:LISTEN_TOTAL,m:Math.max(1,+$('onlyLm').value||30)}],examName,ytId);
+  beginExam(name,f?'':driveId,[{label:'Listening',listen:true,mondai:cloneMondai(),pages,q:LISTEN_TOTAL,m:Math.max(1,+$('onlyLm').value||30)}],examName,ytId);
 };
 
 async function startPart(i,auto,resumeSec){
@@ -718,17 +752,30 @@ function toggleMark(val){
 }
 function fillOpts(el,cnt){
   el.innerHTML='';
+  el.classList.toggle('three',cnt===3);
   for(let k=1;k<=cnt;k++){
     const b=document.createElement('button');b.textContent=lbl(k);
     b.onclick=()=>chooseOpt(k);
     el.appendChild(b);
   }
 }
-function buildSheet(){
-  cur=1;const P=cfg.parts[part],ch=$('chips');ch.innerHTML='';
+function addQuestionToMondai(mIdx){
+  const P=cfg.parts[part],list=partMondai(P);
+  let off=0;
+  for(let k=0;k<=mIdx;k++)off+=list[k].q;
+  const insertAt=off+1;
+  list[mIdx].q++;
+  P.q++;
+  ans[part].splice(insertAt,0,undefined);
+  marks[part].splice(insertAt,0,undefined);
+  if(flags[part])flags[part].splice(insertAt,0,undefined);
+  buildSheet(insertAt);
+}
+function buildSheet(keepCur){
+  cur=keepCur||1;const P=cfg.parts[part],ch=$('chips');ch.innerHTML='';
   if(P.listen){
     let q=0;
-    for(const md of LISTEN_MONDAI){
+    partMondai(P).forEach((md,mIdx)=>{
       const tag=document.createElement('span');tag.className='m-tag';tag.textContent='M'+md.m;ch.appendChild(tag);
       for(let j=1;j<=md.q;j++){
         const idx=++q,b=document.createElement('button');
@@ -736,15 +783,23 @@ function buildSheet(){
         b.onclick=()=>{cur=idx;refresh()};
         ch.appendChild(b);
       }
-    }
+      const addB=document.createElement('button');
+      addB.className='chip add-q';addB.textContent='+';addB.title=`Mondai ${md.m}-এ প্রশ্ন যোগ করো`;
+      addB.onclick=()=>addQuestionToMondai(mIdx);
+      ch.appendChild(addB);
+    });
   }else{
     for(let i=1;i<=P.q;i++){
       const b=document.createElement('button');b.className='chip';b.textContent=i;b.dataset.q=i;
       b.onclick=()=>{cur=i;refresh()};ch.appendChild(b);
     }
+    const addB=document.createElement('button');
+    addB.className='chip add-q';addB.textContent='+';addB.title='নতুন প্রশ্ন যোগ করো';
+    addB.onclick=()=>{P.q++;buildSheet(P.q)};
+    ch.appendChild(addB);
   }
   $('rwBtns').classList.toggle('hide',!P.listen);
-  const nOpts=P.listen?listenInfo(1).opts:4;
+  const nOpts=P.listen?listenInfo(cur,P).opts:4;
   fillOpts($('opts'),nOpts);
   if($('lOpts'))fillOpts($('lOpts'),nOpts);
   refresh();
@@ -823,19 +878,25 @@ function playBeep(times){
     }
   }catch(e){}
 }
-$('pauseBtn').onclick=()=>{
-  if(paused){
-    paused=false;
-    endAt=Date.now()+pausedRem*1000;
-    $('pauseBtn').textContent='⏸';$('timer').classList.remove('paused');
-    onTick();
-  }else{
+function setPaused(state){
+  if(state===paused)return;
+  if(state){
     paused=true;
     pausedRem=Math.max(0,(endAt-Date.now())/1000);
     $('pauseBtn').textContent='▶';$('timer').classList.add('paused');
+    $('exam').classList.add('is-paused');$('pauseOverlay').classList.remove('hide');
+    try{if(ytPlayer&&typeof ytPlayer.pauseVideo==='function')ytPlayer.pauseVideo()}catch(e){}
+  }else{
+    paused=false;
+    endAt=Date.now()+pausedRem*1000;
+    $('pauseBtn').textContent='⏸';$('timer').classList.remove('paused');
+    $('exam').classList.remove('is-paused');$('pauseOverlay').classList.add('hide');
+    onTick();
   }
   saveActiveExam();
-};
+}
+$('pauseBtn').onclick=()=>setPaused(!paused);
+$('resumeOverlayBtn').onclick=()=>setPaused(false);
 $('ytSpdBar').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   const r=+b.dataset.r;
   $('ytSpdBar').querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x===b));
@@ -857,6 +918,7 @@ function finishPart(auto){
   clearInterval(tick);
   const remNow=paused?pausedRem:Math.max(0,(endAt-Date.now())/1000);
   paused=false;$('pauseBtn').textContent='⏸';$('timer').classList.remove('paused');
+  $('exam').classList.remove('is-paused');$('pauseOverlay').classList.add('hide');
   used[part]=auto?limit:Math.min(limit,limit-remNow);
   if(part<cfg.parts.length-1)startPart(part+1,auto);
   else if(part===1&&cfg.parts.length===2){
@@ -865,10 +927,10 @@ function finishPart(auto){
     $('askListenModal').classList.remove('hide');
   }else if(cfg.parts[part].listen){
     clearActiveExam();
-    const M=marks[part]||[];
+    const M=marks[part]||[],eff=effectiveCount(ans[part],M,cfg.parts[part].q);
     let marked=0;
-    for(let q=1;q<=LISTEN_TOTAL;q++)if(M[q]==='ok'||M[q]==='bad')marked++;
-    if($('listenMode').value==='later'||marked<LISTEN_TOTAL)openReview(part);
+    for(let q=1;q<=eff;q++)if(M[q]==='ok'||M[q]==='bad')marked++;
+    if($('listenMode').value==='later'||(eff>0&&marked<eff))openReview(part);
     else showReport();
   }else{clearActiveExam();showReport()}
 }
@@ -890,9 +952,17 @@ function reviewPartIndices(){
 function updLrProg(){
   let c=0,tot=0;
   for(const pi of reviewPartIndices()){
-    const P=cfg.parts[pi],M=marks[pi]||[];
-    tot+=P.q;
-    for(let q=1;q<=P.q;q++)if(M[q]==='ok'||M[q]==='bad')c++;
+    const P=cfg.parts[pi],A=ans[pi]||[],M=marks[pi]||[];
+    if(P.listen){
+      for(const md of effectiveMondai(P,A,M)){
+        tot+=md.effQ;
+        for(let j=1;j<=md.effQ;j++)if(M[md.off+j]==='ok'||M[md.off+j]==='bad')c++;
+      }
+    }else{
+      const eff=effectiveCount(A,M,P.q);
+      tot+=eff;
+      for(let q=1;q<=eff;q++)if(M[q]==='ok'||M[q]==='bad')c++;
+    }
   }
   $('lrProg').textContent=c+'/'+tot+' marked';
 }
@@ -923,11 +993,12 @@ function openReview(pIdx){
         <button type="button" class="btn sec key-btn" data-p="${pi}" data-start="1" data-len="${P.q}">Auto-Check</button>
       </div>`;
     if(P.listen){
-      let marked=0,missingGroups=[],q=0;
-      for(const md of LISTEN_MONDAI){
+      const mds=effectiveMondai(P,A,M);
+      let marked=0,missingGroups=[];
+      for(const md of mds){
         const items=[];
-        for(let j=1;j<=md.q;j++){
-          const idx=++q;
+        for(let j=1;j<=md.effQ;j++){
+          const idx=md.off+j;
           if(M[idx]==='ok'||M[idx]==='bad')marked++;
           else items.push({idx,j});
         }
@@ -941,21 +1012,24 @@ function openReview(pIdx){
         }
         html+=`</div>`;
       }
-      q=0;
-      for(const md of LISTEN_MONDAI){
-        const startIdx=q+1;
-        html+=`<div class="mondai-hd">Mondai ${md.m} (${md.q}টি)</div>
+      for(const md of mds){
+        if(!md.effQ)continue;
+        const startIdx=md.off+1;
+        html+=`<div class="mondai-hd">Mondai ${md.m} (${md.effQ}টি)</div>
         <div class="key-bar" style="margin:6px 0">
-          <input class="key-in" data-p="${pi}" data-start="${startIdx}" data-len="${md.q}" placeholder="Mondai ${md.m} key (${md.q}টা, e.g. 1 3 2...)">
-          <button type="button" class="btn sec key-btn" data-p="${pi}" data-start="${startIdx}" data-len="${md.q}">Check M${md.m}</button>
+          <input class="key-in" data-p="${pi}" data-start="${startIdx}" data-len="${md.effQ}" placeholder="Mondai ${md.m} key (${md.effQ}টা, e.g. 1 3 2...)">
+          <button type="button" class="btn sec key-btn" data-p="${pi}" data-start="${startIdx}" data-len="${md.effQ}">Check M${md.m}</button>
         </div>`;
-        for(let j=1;j<=md.q;j++){
-          const idx=++q;
+        for(let j=1;j<=md.effQ;j++){
+          const idx=md.off+j;
           html+=lrRowHtml(pi,idx,j,A[idx],M[idx]);
         }
       }
+      if(!mds.some(m=>m.effQ>0))html+=`<div class="mu">কোনো উত্তর দেওয়া হয়নি।</div>`;
     }else{
-      for(let q=1;q<=P.q;q++)html+=lrRowHtml(pi,q,q,A[q],M[q]);
+      const eff=effectiveCount(A,M,P.q);
+      if(!eff)html+=`<div class="mu">কোনো উত্তর দেওয়া হয়নি।</div>`;
+      else for(let q=1;q<=eff;q++)html+=lrRowHtml(pi,q,q,A[q],M[q]);
     }
     html+=`</div>`;
   }
@@ -995,11 +1069,10 @@ function openReview(pIdx){
 $('lrHomeBtn').onclick=()=>goHome();
 $('lrShowReportBtn').onclick=()=>{
   if(lrPartIdx>=0&&cfg.parts[lrPartIdx]?.listen){
-    const M=marks[lrPartIdx]||[],lines=[];
-    let q=0;
-    for(const md of LISTEN_MONDAI){
+    const P=cfg.parts[lrPartIdx],A=ans[lrPartIdx]||[],M=marks[lrPartIdx]||[],lines=[];
+    for(const md of effectiveMondai(P,A,M)){
       const miss=[];
-      for(let j=1;j<=md.q;j++){const idx=++q;if(M[idx]!=='ok'&&M[idx]!=='bad')miss.push(j)}
+      for(let j=1;j<=md.effQ;j++){const idx=md.off+j;if(M[idx]!=='ok'&&M[idx]!=='bad')miss.push(j)}
       if(miss.length)lines.push(`Mondai ${md.m} - ${miss.join(', ')}`);
     }
     if(lines.length){
@@ -1019,7 +1092,7 @@ $('yesListenBtn').onclick=()=>{
   $('askListenModal').classList.add('hide');
   cfg.ytId=ytId;
   const lp=(pdf&&!cfg.driveId&&$('p3pages').value.trim())?parsePages($('p3pages').value,pdf.numPages):[];
-  cfg.parts.push({label:'Listening',listen:true,pages:lp,q:LISTEN_TOTAL,m:Math.max(1,+$('p3m').value||30)});
+  cfg.parts.push({label:'Listening',listen:true,mondai:cloneMondai(),pages:lp,q:LISTEN_TOTAL,m:Math.max(1,+$('p3m').value||30)});
   ans.push([]);marks.push([]);flags.push([]);used.push(0);
   startPart(2,pendingAuto);
 };
@@ -1051,25 +1124,29 @@ function showReport(keepTime){
   let html='<div class="rep-grid">',txt=`Report Card\n${cfg.examName?'Exam Name: '+cfg.examName+'\n':''}Name: ${cfg.name}\nDate: ${repTime}\n`;
   let totAns=0,totQ=0,totTime=0,totOk=0,totBad=0;
   cfg.parts.forEach((P,i)=>{
-    const A=ans[i],n=A.filter(Boolean).length,{M,ok,bad,has}=markStats(i);
-    totAns+=n;totQ+=P.q;totTime+=used[i];totOk+=ok;totBad+=bad;
-    const pct=has?Math.round(ok*100/P.q):0;
+    const A=ans[i],{M,ok,bad,has}=markStats(i);
+    const mds=P.listen?effectiveMondai(P,A,M):null;
+    const effPartQ=P.listen?mds.reduce((s,m)=>s+m.effQ,0):effectiveCount(A,M,P.q);
+    const dispQ=effPartQ||P.q;
+    const n=A.filter(Boolean).length;
+    totAns+=n;totQ+=dispQ;totTime+=used[i];totOk+=ok;totBad+=bad;
+    const pct=has&&dispQ?Math.round(ok*100/dispQ):0;
     const fullStyle=P.listen&&cfg.parts.length===3?' style="grid-column:1/-1"':'';
     html+=`<div class="rep-card"${fullStyle}><h3>${P.label}</h3>
       <div class="stat"><span>Time used</span><b>${fmt(used[i])} / ${fmt(P.m*60)}</b></div>
-      <div class="stat"><span>Answered</span><b>${n} / ${P.q}</b></div>`;
+      <div class="stat"><span>Answered</span><b>${n} / ${dispQ}</b></div>`;
     if(has){
       html+=`<div class="stat"><span>Right / Wrong</span><b><span style="color:var(--ok)">✓ ${ok}</span> · <span style="color:var(--bad)">✕ ${bad}</span> (${pct}%)</b></div>`;
     }
-    txt+=`\n${P.label} — time ${fmt(used[i])} / ${fmt(P.m*60)}, answered ${n}/${P.q}`+(has?`, right ${ok}, wrong ${bad} (${pct}%)`:'')+'\n';
+    txt+=`\n${P.label} — time ${fmt(used[i])} / ${fmt(P.m*60)}, answered ${n}/${dispQ}`+(has?`, right ${ok}, wrong ${bad} (${pct}%)`:'')+'\n';
     if(P.listen){
       html+=`<div style="margin-top:8px;border-top:1px solid var(--bd);padding-top:4px">`;
-      let q=0;
-      for(const md of LISTEN_MONDAI){
+      for(const md of mds){
+        if(!md.effQ)continue;
         html+=`<div class="mondai-hd">Mondai ${md.m}</div><div class="ans-grid">`;
         txt+=`Mondai ${md.m}:\n`;
-        for(let j=1;j<=md.q;j++){
-          const idx=++q,val=A[idx],a=val?lbl(val):'—',mk=M[idx];
+        for(let j=1;j<=md.effQ;j++){
+          const idx=md.off+j,val=A[idx],a=val?lbl(val):'—',mk=M[idx];
           const cls=mk==='ok'?' ok':mk==='bad'?' bad':val?'':' empty';
           const badge=mk==='ok'?' ✓':mk==='bad'?' ✕':'';
           html+=`<div class="ans-item${cls}"><span>${j})</span><b>${a}${badge}</b></div>`;
@@ -1077,10 +1154,12 @@ function showReport(keepTime){
         }
         html+='</div>';
       }
+      if(!effPartQ)html+='<div class="mu" style="padding:6px 0">কোনো উত্তর দেওয়া হয়নি।</div>';
       html+='</div>';
     }else{
       html+=`<div class="ans-grid" style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px">`;
-      for(let q=1;q<=P.q;q++){
+      if(!effPartQ)html+='<div class="mu" style="grid-column:1/-1">কোনো উত্তর দেওয়া হয়নি।</div>';
+      else for(let q=1;q<=effPartQ;q++){
         const val=A[q],a=val?lbl(val):'—',mk=M[q];
         const cls=mk==='ok'?' ok':mk==='bad'?' bad':val?'':' empty';
         const badge=mk==='ok'?' ✓':mk==='bad'?' ✕':'';
@@ -1102,11 +1181,13 @@ function showReport(keepTime){
 function saveReportImage(){
   const W=920,pad=28,gap=20,colW=(W-pad*2-gap)/2,fullW=W-pad*2,rowH=28,boxTop=88;
   const partH=(P,i)=>{
-    const {has}=markStats(i),head=has?94:76;
+    const A=ans[i]||[],{M,has}=markStats(i),head=has?94:76;
     if(P.listen){
-      return head+LISTEN_MONDAI.reduce((s,md)=>s+26+Math.ceil(md.q/2)*rowH,0)+10;
+      const mds=effectiveMondai(P,A,M).filter(m=>m.effQ>0);
+      return head+(mds.length?mds.reduce((s,md)=>s+26+Math.ceil(md.effQ/2)*rowH,0):26)+10;
     }
-    return head+Math.ceil(P.q/2)*rowH+12;
+    const eff=effectiveCount(A,M,P.q);
+    return head+(eff?Math.ceil(eff/2)*rowH:26)+12;
   };
   const nParts=cfg.parts.length;
   let totalCardsH=0;
@@ -1139,16 +1220,19 @@ function saveReportImage(){
   let totAns=0,totQ=0,totTime=0,totOk=0,totBad=0;
   cfg.parts.forEach((P,i)=>{
     const {x,y,w,h}=layouts[i],A=ans[i],n=A.filter(Boolean).length,{M,ok,bad,has}=markStats(i);
-    totAns+=n;totQ+=P.q;totTime+=used[i];totOk+=ok;totBad+=bad;
+    const mds=P.listen?effectiveMondai(P,A,M):null;
+    const effPartQ=P.listen?mds.reduce((s,m)=>s+m.effQ,0):effectiveCount(A,M,P.q);
+    const dispQ=effPartQ||P.q;
+    totAns+=n;totQ+=dispQ;totTime+=used[i];totOk+=ok;totBad+=bad;
     ctx.fillStyle='#ffffff';ctx.strokeStyle='#e2e4e9';ctx.lineWidth=1.5;
     rrect(x,y,w,h,14);ctx.fill();ctx.stroke();
     ctx.fillStyle='#18181b';ctx.font='bold 18px system-ui,sans-serif';
     ctx.fillText(P.label,x+16,y+28);
     ctx.font='13px system-ui,sans-serif';ctx.fillStyle='#6b7280';
     ctx.fillText(`Time: ${fmt(used[i])} / ${fmt(P.m*60)}`,x+16,y+50);
-    ctx.textAlign='right';ctx.fillText(`Answered: ${n} / ${P.q}`,x+w-16,y+50);ctx.textAlign='left';
+    ctx.textAlign='right';ctx.fillText(`Answered: ${n} / ${dispQ}`,x+w-16,y+50);ctx.textAlign='left';
     if(has){
-      const pct=Math.round(ok*100/P.q);
+      const pct=dispQ?Math.round(ok*100/dispQ):0;
       ctx.font='bold 13px system-ui,sans-serif';
       ctx.fillStyle='#16a34a';ctx.fillText(`Right: ${ok} (${pct}%)`,x+16,y+70);
       ctx.fillStyle='#dc2626';ctx.fillText(`Wrong: ${bad}`,x+130,y+70);
@@ -1168,19 +1252,19 @@ function saveReportImage(){
       ctx.textAlign='right';ctx.fillText(a,cx+cellW-10,ry+17);ctx.textAlign='left';
     };
     if(P.listen){
-      let q=0;
-      for(const md of LISTEN_MONDAI){
+      for(const md of mds){
+        if(!md.effQ)continue;
         ctx.fillStyle='#2563eb';ctx.font='bold 12px system-ui,sans-serif';
         ctx.fillText('Mondai '+md.m,x+16,cy+15);
         cy+=26;
-        for(let j=1;j<=md.q;j++){
-          const idx=++q,r=Math.floor((j-1)/2),col=(j-1)%2;
+        for(let j=1;j<=md.effQ;j++){
+          const idx=md.off+j,r=Math.floor((j-1)/2),col=(j-1)%2;
           drawCell(x+16+col*(cellW+10),cy+r*rowH,j,A[idx],M[idx]);
         }
-        cy+=Math.ceil(md.q/2)*rowH;
+        cy+=Math.ceil(md.effQ/2)*rowH;
       }
     }else{
-      for(let q=1;q<=P.q;q++){
+      for(let q=1;q<=effPartQ;q++){
         const r=Math.floor((q-1)/2),col=(q-1)%2;
         drawCell(x+16+col*(cellW+10),cy+r*rowH,q,A[q],M[q]);
       }
@@ -1253,6 +1337,7 @@ function buildExamRecord(){
     st:cfg.style||'num',
     p:cfg.parts.map((P,i)=>({
       l:P.label,ls:P.listen?1:0,q:P.q,m:P.m,
+      mq:P.listen?partMondai(P).map(x=>x.q):undefined,
       u:Math.round(used[i]||0),
       a:packArr(ans[i]||[],P.q,'0'),
       k:packArr(marks[i]||[],P.q,'.')
@@ -1263,7 +1348,15 @@ function applyExamRecord(rec){
   currentExamId=rec.id||('ex_'+Date.now().toString(36));
   repTime=rec.dt||new Date().toLocaleString();
   cfg={name:rec.n||'Student',driveId:'',examName:rec.en||'',ytId:'',style:rec.st||'num',
-    parts:rec.p.map(x=>({label:x.l,listen:!!x.ls,pages:[],q:x.q,m:x.m}))};
+    parts:rec.p.map(x=>{
+      const pt={label:x.l,listen:!!x.ls,pages:[],q:x.q,m:x.m};
+      if(pt.listen){
+        const mds=cloneMondai();
+        if(Array.isArray(x.mq)&&x.mq.length===4)mds.forEach((md,k)=>md.q=+x.mq[k]||md.q);
+        pt.mondai=mds;
+      }
+      return pt;
+    })};
   ans=rec.p.map(x=>unpackAns(x.a||'',x.q));
   marks=rec.p.map(x=>unpackMarks(x.k||'',x.q));
   used=rec.p.map(x=>x.u||0);
