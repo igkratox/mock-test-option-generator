@@ -149,6 +149,16 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 .drawer-bd{flex:1;overflow:auto;padding:14px 16px}
 .menu-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .menu-acts button{width:100%;padding:9px 10px;font-size:13px;text-align:center}
+.presets{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.preset-btn{flex:1;min-width:140px;padding:9px 12px;border-radius:10px;border:1px solid var(--ac);background:var(--ac-soft);color:var(--ac);font-weight:700;font-size:13px;text-align:center}
+.preset-btn:hover{filter:brightness(1.04)}
+.chip.flag{box-shadow:0 0 0 2px #f59e0b inset}
+.top .t.paused{opacity:.65;border:1px dashed var(--ac)}
+.icon-btn{padding:5px 8px;font-size:13px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx)}
+.flag-btn.sel{background:#fef3c7;border-color:#f59e0b;color:#b45309}
+.yt-spd{display:inline-flex;gap:4px;margin-left:auto}
+.yt-spd button{padding:3px 7px;font-size:11px;border-radius:6px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-weight:700}
+.yt-spd button.sel{background:var(--ac);border-color:var(--ac);color:var(--acx)}
 </style>
 </head>
 <body>
@@ -171,8 +181,19 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     <button type="button" class="menu-btn" id="menuBtn" title="Menu & History">☰<span class="menu-badge hide" id="menuBadge">0</span></button>
   </div>
 
+  <div id="resumeBanner" class="card hide" style="border-color:var(--ac);background:var(--ac-soft)">
+    <div style="font-weight:700;font-size:14px">অসমাপ্ত Exam পাওয়া গেছে!</div>
+    <div class="mu" id="resumeMeta" style="margin-top:2px"></div>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="btn" id="resumeExamBtn" style="margin:0;padding:9px 12px">Resume Exam</button>
+      <button type="button" class="btn sec" id="discardExamBtn">Discard</button>
+    </div>
+  </div>
+
   <label>তোমার নাম</label>
   <input id="name" placeholder="Name">
+  <label>Exam Name <span class="mu">(optional — যেমন: N5 Dec 2023)</span></label>
+  <input id="examNameIn" placeholder="e.g. N5 Dec 2023 (খালি রাখলে PDF নাম নেবে)">
 
   <label>Question PDF <span class="mu">(অথবা নিচে Drive link দাও)</span></label>
   <input id="file" type="file" accept="application/pdf">
@@ -180,19 +201,24 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   <input id="gdrive" type="url" placeholder="https://drive.google.com/file/d/.../view">
   <div id="detect" class="mu" style="margin-top:6px"></div>
 
+  <div class="presets">
+    <button type="button" class="preset-btn" id="preset43">43 Questions<br><span style="font-weight:500;font-size:11px">21q (20m) + 22q (40m)</span></button>
+    <button type="button" class="preset-btn" id="preset67">67 Questions<br><span style="font-weight:500;font-size:11px">35q (25m) + 32q (50m)</span></button>
+  </div>
+
   <div class="card">
-    <h3>Part 1 <span class="mu">(ভুল detect হলে ঠিক করো)</span></h3>
+    <h3>Part 1 <span class="mu">(Questions সংখ্যা নিজে দাও)</span></h3>
     <div class="row">
-      <div><div class="mu">Questions</div><div class="step"><button data-t="p1q" data-d="-1">−</button><input id="p1q" type="number" min="1" placeholder="auto"><button data-t="p1q" data-d="1">+</button></div></div>
+      <div><div class="mu">Questions</div><div class="step"><button data-t="p1q" data-d="-1">−</button><input id="p1q" type="number" min="1" placeholder="e.g. 21"><button data-t="p1q" data-d="1">+</button></div></div>
       <div><div class="mu">Time (min)</div><div class="step"><button data-t="p1m" data-d="-5">−</button><input id="p1m" type="number" min="1" value="20"><button data-t="p1m" data-d="5">+</button></div></div>
     </div>
     <div style="margin-top:8px"><div class="mu">PDF pages</div><input id="p1pages" placeholder="auto (e.g. 2-6)"></div>
   </div>
 
   <div class="card">
-    <h3>Part 2 <span class="mu">(ভুল detect হলে ঠিক করো)</span></h3>
+    <h3>Part 2 <span class="mu">(Questions সংখ্যা নিজে দাও)</span></h3>
     <div class="row">
-      <div><div class="mu">Questions</div><div class="step"><button data-t="p2q" data-d="-1">−</button><input id="p2q" type="number" min="1" placeholder="auto"><button data-t="p2q" data-d="1">+</button></div></div>
+      <div><div class="mu">Questions</div><div class="step"><button data-t="p2q" data-d="-1">−</button><input id="p2q" type="number" min="1" placeholder="e.g. 22"><button data-t="p2q" data-d="1">+</button></div></div>
       <div><div class="mu">Time (min)</div><div class="step"><button data-t="p2m" data-d="-5">−</button><input id="p2m" type="number" min="1" value="40"><button data-t="p2m" data-d="5">+</button></div></div>
     </div>
     <div style="margin-top:8px"><div class="mu">PDF pages</div><input id="p2pages" placeholder="auto (e.g. 8-13)"></div>
@@ -241,6 +267,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
         </div>
       </div>
       <div style="margin-top:14px;font-weight:700;font-size:14px">Recent Exams</div>
+      <input id="histSearch" placeholder="Exam বা নাম দিয়ে search করো…" style="margin-top:8px;padding:8px 10px;font-size:13px">
       <div id="historyList" style="margin-top:6px"></div>
     </div>
   </div>
@@ -252,6 +279,8 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     <strong id="partLabel">Part 1</strong>
     <span class="mu" id="progress"></span>
     <span class="t" id="timer">20:00</span>
+    <button type="button" class="icon-btn" id="pauseBtn" title="Pause / Resume Timer">⏸</button>
+    <button type="button" class="icon-btn" id="muteBtn" title="Warning Sound On/Off">🔊</button>
     <button class="btn sec" id="nextBtn">Next ▸</button>
     <div class="pbar"><i id="pbar"></i></div>
   </div>
@@ -261,6 +290,11 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
       <option value="instant">Answer Instant</option>
       <option value="later">Answer Later</option>
     </select>
+    <div class="yt-spd hide" id="ytSpdBar">
+      <button type="button" data-r="0.75">0.75x</button>
+      <button type="button" data-r="1" class="sel">1x</button>
+      <button type="button" data-r="1.25">1.25x</button>
+    </div>
   </div>
   <div class="yt-top hide" id="ytTopWrap"></div>
   <div class="main">
@@ -272,8 +306,10 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     <div class="cur">
       <button class="nav" id="prevQ">◀</button>
       <span id="curQ" class="curq">Q1</span>
+      <button type="button" class="icon-btn flag-btn" id="flagBtn" title="Flag question">☆</button>
       <div class="opts" id="opts"></div>
       <div class="rw hide" id="rwBtns"><button id="rwOk" class="ok" title="Right">✓</button><button id="rwBad" class="bad" title="Wrong">✕</button></div>
+      <button type="button" class="icon-btn" id="jumpNextBtn" title="Jump to next unanswered / flagged">?</button>
       <button class="nav" id="nextQ">▶</button>
     </div>
   </div>
@@ -423,33 +459,14 @@ async function detect(){
         coverPages=[covers[0]??0,p2Start-1];
       }
     }
-    const unitRe=/^(?:分|ぷん|ふん|時|日|月|年|円|人|個|本|枚|冊|匹|台|回|番|歳|才|階|ページ|min)/i;
     ranges.forEach((r,i)=>{
       const cp=coverPages[i];
       const cover=cp!==undefined?pages[cp].join(' '):'';
       const m=cover.match(/(\d+)\s*(?:ぷん|ふん|分|min(?:ute)?s?)/i);
-      const seen=new Set();
-      for(let p=r[0];p<=r[1];p++){
-        const {H,items}=pageMeta[p-1];
-        for(let idx=0;idx<items.length;idx++){
-          const {s,y}=items[idx];
-          if(y<H*0.06||y>H*0.94)continue;
-          const next=(items[idx+1]?.s||'').trim();
-          if(unitRe.test(next))continue;
-          const t=s.trim();
-          const m1=t.match(/^(?:\(|（)?(\d{1,2})(?:\)|）|\.|、)?$/);
-          if(m1){const v=+m1[1];if(v>=1&&v<=60)seen.add(v);continue}
-          if(/^\d{1,2}(?:\s+\d{1,2})+$/.test(t)){
-            t.split(/\s+/).forEach(x=>{const v=+x;if(v>=1&&v<=60)seen.add(v)});
-          }
-        }
-      }
-      const totalQ=contLen(seen,1);
       $('p'+(i+1)+'pages').value=r[0]+'-'+r[1];
-      if(totalQ)$('p'+(i+1)+'q').value=totalQ;
       if(m)$('p'+(i+1)+'m').value=m[1];
     });
-    if(!st.textContent.includes('আনুমানিক'))st.textContent='✓ Auto-detect হয়েছে। নিচে ভুল থাকলে সরাসরি edit করো।';
+    if(!st.textContent.includes('আনুমানিক'))st.textContent='✓ PDF pages detect হয়েছে। নিচে Part 1 ও Part 2-এর Questions সংখ্যা দাও (অথবা 43 / 67 Preset চাপো)।';
   }catch(e){st.textContent='Scan error: '+e.message}
 }
 const driveIdOf=u=>{const m=(u||'').trim().match(/\/d\/([a-zA-Z0-9_-]{10,})|[?&]id=([a-zA-Z0-9_-]{10,})/);return m?(m[1]||m[2]):''};
@@ -498,16 +515,30 @@ $('gdrive').oninput=()=>{
   else if($('gdrive').value.trim())$('detect').textContent='সঠিক Google Drive file link দাও।';
   else $('detect').textContent='';
 };
-document.querySelectorAll('.step button').forEach(b=>b.onclick=()=>{const i=$(b.dataset.t);i.value=Math.max(1,(+i.value||0)+ +b.dataset.d)});
+function syncSmartTime(id){
+  const v=+$('p'+id+'q').value;
+  if(id===1){if(v===21)$('p1m').value=20;else if(v===35)$('p1m').value=25}
+  else if(id===2){if(v===22)$('p2m').value=40;else if(v===32)$('p2m').value=50}
+}
+$('p1q').oninput=()=>syncSmartTime(1);
+$('p2q').oninput=()=>syncSmartTime(2);
+$('preset43').onclick=()=>{$('p1q').value=21;$('p1m').value=20;$('p2q').value=22;$('p2m').value=40};
+$('preset67').onclick=()=>{$('p1q').value=35;$('p1m').value=25;$('p2q').value=32;$('p2m').value=50};
+document.querySelectorAll('.step button').forEach(b=>b.onclick=()=>{
+  const i=$(b.dataset.t);i.value=Math.max(1,(+i.value||0)+ +b.dataset.d);
+  if(b.dataset.t==='p1q')syncSmartTime(1);
+  if(b.dataset.t==='p2q')syncSmartTime(2);
+});
 
-let currentExamId='';
+let currentExamId='',flags=[],paused=false,pausedRem=0,warn5=false,warn1=false;
 function beginExam(name,driveId,parts,examName,ytId){
   saveProfileName(name);
   currentExamId='ex_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
-  repTime='';
+  repTime='';paused=false;pausedRem=0;
   cfg={name,driveId,examName:examName||'',ytId:ytId||'',style:$('style').value,parts};
   ans=parts.map(()=>[]);
   marks=parts.map(()=>[]);
+  flags=parts.map(()=>[]);
   used=parts.map(()=>0);
   $('driveWrap').innerHTML='';$('driveWrap').classList.add('hide');$('pages').classList.remove('hide');
   $('setup').classList.add('hide');$('report').classList.add('hide');$('listenReview').classList.add('hide');$('exam').classList.remove('hide');
@@ -517,6 +548,7 @@ function beginExam(name,driveId,parts,examName,ytId){
 $('startBtn').onclick=async()=>{
   $('err').textContent='';
   const name=$('name').value.trim(),f=$('file').files[0],driveId=driveIdOf($('gdrive').value);
+  const customEx=$('examNameIn').value.trim();
   if(!name){$('err').textContent='নাম লেখো।';return}
   if(!f&&!driveId){$('err').textContent='PDF select করো অথবা Google Drive link দাও।';return}
   if(driveId&&!f){
@@ -525,7 +557,7 @@ $('startBtn').onclick=async()=>{
       label:'Part '+(i+1),listen:false,pages:[],
       q:Math.max(1,+$('p'+(i+1)+'q').value||1),
       m:Math.max(1,+$('p'+(i+1)+'m').value||(i?40:20))}));
-    beginExam(name,driveId,parts,'');
+    beginExam(name,driveId,parts,customEx);
     return;
   }
   for(const i of [1,2])if(!$('p'+i+'pages').value||!$('p'+i+'q').value){$('err').textContent='Part '+i+' এর Questions বা PDF pages ফাঁকা।';return}
@@ -538,7 +570,7 @@ $('startBtn').onclick=async()=>{
     pages:parsePages($('p'+(i+1)+'pages').value,pdf.numPages),
     q:Math.max(1,+$('p'+(i+1)+'q').value||1),
     m:Math.max(1,+$('p'+(i+1)+'m').value||(i?40:20))}));
-  beginExam(name,'',parts,f.name.replace(/\.pdf$/i,''));
+  beginExam(name,'',parts,customEx||f.name.replace(/\.pdf$/i,''));
 };
 
 $('onlyListenBtn').onclick=async()=>{
@@ -546,9 +578,9 @@ $('onlyListenBtn').onclick=async()=>{
   const name=$('name').value.trim()||'Student',f=$('file').files[0],driveId=driveIdOf($('gdrive').value);
   const ytRaw=$('onlyListenYt').value.trim(),ytId=ytIdOf(ytRaw);
   if(ytRaw&&!ytId){$('err').textContent='সঠিক YouTube link দাও (অথবা খালি রাখো)।';return}
-  let pages=[],examName='';
+  let pages=[],examName=$('examNameIn').value.trim();
   if(f){
-    examName=f.name.replace(/\.pdf$/i,'');
+    if(!examName)examName=f.name.replace(/\.pdf$/i,'');
     $('onlyListenBtn').textContent='Loading…';
     try{
       if(!pdf){await setWorker();pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise}
@@ -558,7 +590,7 @@ $('onlyListenBtn').onclick=async()=>{
   beginExam(name,f?'':driveId,[{label:'Listening',listen:true,pages,q:LISTEN_TOTAL,m:Math.max(1,+$('onlyLm').value||30)}],examName,ytId);
 };
 
-async function startPart(i,auto){
+async function startPart(i,auto,resumeSec){
   stopYt();
   part=i;const P=cfg.parts[i];
   $('partLabel').textContent=P.label;
@@ -566,6 +598,8 @@ async function startPart(i,auto){
   $('listenModeBar').classList.toggle('hide',!P.listen);
   const usePad=P.listen&&!cfg.driveId&&!P.pages.length;
   const hasYt=!!(P.listen&&cfg.ytId);
+  $('ytSpdBar').classList.toggle('hide',!hasYt);
+  $('ytSpdBar').querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.r==='1'));
   document.querySelector('.dock').classList.toggle('pad-only',usePad);
   if(usePad){
     document.querySelector('.zoom').classList.add('hide');
@@ -597,8 +631,14 @@ async function startPart(i,auto){
     }
   }
   buildSheet();
-  limit=P.m*60;endAt=Date.now()+limit*1000;
+  limit=P.m*60;
+  const rem0=(typeof resumeSec==='number'&&resumeSec>0)?Math.min(limit,resumeSec):limit;
+  endAt=Date.now()+rem0*1000;
+  paused=false;pausedRem=0;
+  $('pauseBtn').textContent='⏸';$('timer').classList.remove('paused');
+  warn5=rem0<=300;warn1=rem0<=60;
   clearInterval(tick);tick=setInterval(onTick,250);onTick();
+  saveActiveExam();
   if(auto)toast(cfg.parts[i-1].label+'-এর সময় শেষ! '+P.label+' শুরু হয়েছে।');
   if(usePad){$('pages').classList.remove('hide');$('driveWrap').classList.add('hide');return}
   if(cfg.driveId){
@@ -710,7 +750,7 @@ function buildSheet(){
   refresh();
 }
 function refresh(){
-  const P=cfg.parts[part],A=ans[part],M=marks[part]||[];
+  const P=cfg.parts[part],A=ans[part],M=marks[part]||[],F=flags[part]||[];
   const nOpts=P.listen?listenInfo(cur).opts:4;
   if($('opts').children.length!==nOpts)fillOpts($('opts'),nOpts);
   if($('lOpts')&&$('lOpts').children.length!==nOpts)fillOpts($('lOpts'),nOpts);
@@ -719,6 +759,7 @@ function refresh(){
     const q=+b.dataset.q,mk=M[q];
     b.classList.toggle('done',mk==='ok'||(!mk&&!!A[q]));
     b.classList.toggle('bad',mk==='bad');
+    b.classList.toggle('flag',!!F[q]);
     b.classList.toggle('now',q===cur);
     if(q===cur)activeChip=b;
   });
@@ -728,6 +769,8 @@ function refresh(){
     $('curQ').textContent='M'+info.m+'·Q'+info.num;
     if($('lHead'))$('lHead').textContent='Mondai '+info.m+' · Q'+info.num;
   }else $('curQ').textContent='Q'+cur;
+  $('flagBtn').classList.toggle('sel',!!F[cur]);
+  $('flagBtn').textContent=F[cur]?'★':'☆';
   [...$('opts').children].forEach((b,j)=>b.classList.toggle('sel',A[cur]===j+1));
   if($('lOpts'))[...$('lOpts').children].forEach((b,j)=>b.classList.toggle('sel',A[cur]===j+1));
   if(P.listen){
@@ -737,7 +780,19 @@ function refresh(){
     if($('lBad'))$('lBad').classList.toggle('sel',M[cur]==='bad');
   }
   updProg();
+  saveActiveExam();
 }
+$('flagBtn').onclick=()=>{
+  if(!flags[part])flags[part]=[];
+  flags[part][cur]=!flags[part][cur];
+  refresh();
+};
+$('jumpNextBtn').onclick=()=>{
+  const P=cfg.parts[part],A=ans[part],F=flags[part]||[];
+  for(let off=1;off<=P.q;off++){const q=((cur-1+off)%P.q)+1;if(!A[q]){cur=q;refresh();return}}
+  for(let off=1;off<=P.q;off++){const q=((cur-1+off)%P.q)+1;if(F[q]){cur=q;refresh();return}}
+  toast('সব প্রশ্নের উত্তর দেওয়া হয়েছে!');
+};
 $('rwOk').onclick=()=>toggleMark('ok');
 $('rwBad').onclick=()=>toggleMark('bad');
 $('prevQ').onclick=()=>{if(cur>1){cur--;refresh()}};
@@ -747,28 +802,75 @@ function updProg(){
   $('progress').textContent=n+'/'+tot;
   $('pbar').style.width=(tot?Math.round(n*100/tot):0)+'%';
 }
+let soundMuted=localStorage.getItem('mock_exam_mute_v1')==='1';
+$('muteBtn').textContent=soundMuted?'🔇':'🔊';
+$('muteBtn').onclick=()=>{
+  soundMuted=!soundMuted;
+  $('muteBtn').textContent=soundMuted?'🔇':'🔊';
+  try{localStorage.setItem('mock_exam_mute_v1',soundMuted?'1':'0')}catch(e){}
+};
+function playBeep(times){
+  if(soundMuted)return;
+  try{
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    for(let k=0;k<times;k++){
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.type='sine';o.frequency.value=880;
+      g.gain.setValueAtTime(0.08,ac.currentTime+k*0.22);
+      g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+k*0.22+0.15);
+      o.connect(g);g.connect(ac.destination);
+      o.start(ac.currentTime+k*0.22);o.stop(ac.currentTime+k*0.22+0.16);
+    }
+  }catch(e){}
+}
+$('pauseBtn').onclick=()=>{
+  if(paused){
+    paused=false;
+    endAt=Date.now()+pausedRem*1000;
+    $('pauseBtn').textContent='⏸';$('timer').classList.remove('paused');
+    onTick();
+  }else{
+    paused=true;
+    pausedRem=Math.max(0,(endAt-Date.now())/1000);
+    $('pauseBtn').textContent='▶';$('timer').classList.add('paused');
+  }
+  saveActiveExam();
+};
+$('ytSpdBar').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  const r=+b.dataset.r;
+  $('ytSpdBar').querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x===b));
+  try{if(ytPlayer&&typeof ytPlayer.setPlaybackRate==='function')ytPlayer.setPlaybackRate(r)}catch(e){}
+});
+let lastAutoSaveTs=0;
 function onTick(){
+  if(paused)return;
   const rem=(endAt-Date.now())/1000;
   $('timer').textContent=fmt(rem);
   $('timer').classList.toggle('low',rem<=60);
+  if(!warn5&&rem<=300&&rem>60){warn5=true;playBeep(1);toast('আর ৫ মিনিট বাকি আছে!')}
+  if(!warn1&&rem<=60&&rem>0){warn1=true;playBeep(2);toast('আর ১ মিনিট বাকি আছে!')}
+  if(Date.now()-lastAutoSaveTs>5000){lastAutoSaveTs=Date.now();saveActiveExam()}
   if(rem<=0)finishPart(true);
 }
 let pendingAuto=false;
 function finishPart(auto){
   clearInterval(tick);
-  used[part]=auto?limit:Math.min(limit,limit-(endAt-Date.now())/1000);
+  const remNow=paused?pausedRem:Math.max(0,(endAt-Date.now())/1000);
+  paused=false;$('pauseBtn').textContent='⏸';$('timer').classList.remove('paused');
+  used[part]=auto?limit:Math.min(limit,limit-remNow);
   if(part<cfg.parts.length-1)startPart(part+1,auto);
   else if(part===1&&cfg.parts.length===2){
     pendingAuto=!!auto;
     $('p3pagesWrap').classList.toggle('hide',!(pdf&&!cfg.driveId));
     $('askListenModal').classList.remove('hide');
   }else if(cfg.parts[part].listen){
+    clearActiveExam();
     const M=marks[part]||[];
     let marked=0;
     for(let q=1;q<=LISTEN_TOTAL;q++)if(M[q]==='ok'||M[q]==='bad')marked++;
     if($('listenMode').value==='later'||marked<LISTEN_TOTAL)openReview(part);
     else showReport();
-  }else showReport();
+  }else{clearActiveExam();showReport()}
 }
 let lrPartIdx=-1;
 function lrRowHtml(pi,idx,j,val,mk){
@@ -918,11 +1020,12 @@ $('yesListenBtn').onclick=()=>{
   cfg.ytId=ytId;
   const lp=(pdf&&!cfg.driveId&&$('p3pages').value.trim())?parsePages($('p3pages').value,pdf.numPages):[];
   cfg.parts.push({label:'Listening',listen:true,pages:lp,q:LISTEN_TOTAL,m:Math.max(1,+$('p3m').value||30)});
-  ans.push([]);marks.push([]);used.push(0);
+  ans.push([]);marks.push([]);flags.push([]);used.push(0);
   startPart(2,pendingAuto);
 };
 $('noListenBtn').onclick=()=>{
   $('askListenModal').classList.add('hide');
+  clearActiveExam();
   showReport();
 };
 $('nextBtn').onclick=()=>{
@@ -1252,19 +1355,26 @@ function extractPngText(buf,key){
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function renderHistory(){
   const p=loadProfile(),exams=Array.isArray(p.exams)?p.exams:[];
-  let gradedCnt=0,pctSum=0;
+  let gradedCnt=0,pctSum=0,bestPct=0;
   exams.forEach(ex=>{
     let totQ=0,ok=0,bad=0;
     ex.p.forEach(x=>{totQ+=x.q;for(const c of (x.k||'')){if(c==='o')ok++;else if(c==='x')bad++}});
-    if((ok+bad)>0&&totQ){gradedCnt++;pctSum+=Math.round(ok*100/totQ)}
+    if((ok+bad)>0&&totQ){const pct=Math.round(ok*100/totQ);gradedCnt++;pctSum+=pct;if(pct>bestPct)bestPct=pct}
   });
   $('profileNameDisp').textContent=p.name||'Guest (নাম সেভ করা নেই)';
-  $('profileStats').textContent=`Total Exams: ${exams.length} · Graded: ${gradedCnt}`+(gradedCnt?` · Avg: ${Math.round(pctSum/gradedCnt)}%`:'');
+  $('profileStats').textContent=`Total Exams: ${exams.length} · Graded: ${gradedCnt}`+(gradedCnt?` · Avg: ${Math.round(pctSum/gradedCnt)}% · Best: ${bestPct}%`:'');
   $('menuBadge').textContent=exams.length;
   $('menuBadge').classList.toggle('hide',!exams.length);
+  const qStr=($('histSearch')?.value||'').trim().toLowerCase();
+  const filtered=exams.map((ex,idx)=>({ex,idx})).filter(({ex})=>{
+    if(!qStr)return true;
+    const title=(ex.en||ex.p.map(x=>x.l).join(' + ')).toLowerCase();
+    return title.includes(qStr)||(ex.n||'').toLowerCase().includes(qStr);
+  });
   const list=$('historyList');
   if(!exams.length){list.innerHTML='<div class="mu" style="margin-top:6px">এখনো কোনো exam save হয়নি। Exam দিলে এখানে auto-save থাকবে।</div>';return}
-  list.innerHTML=exams.map((ex,idx)=>{
+  if(!filtered.length){list.innerHTML='<div class="mu" style="margin-top:6px">কোনো exam পাওয়া যায়নি।</div>';return}
+  list.innerHTML=filtered.map(({ex,idx})=>{
     let totQ=0,ok=0,bad=0;
     ex.p.forEach(x=>{totQ+=x.q;for(const c of (x.k||'')){if(c==='o')ok++;else if(c==='x')bad++}});
     const graded=(ok+bad)>0,pct=totQ?Math.round(ok*100/totQ):0;
@@ -1292,6 +1402,7 @@ function renderHistory(){
     const pr=loadProfile();pr.exams.splice(+b.dataset.i,1);saveProfile(pr);renderHistory();
   });
 }
+$('histSearch').oninput=renderHistory;
 function openMenu(){renderHistory();$('menuDrawer').classList.remove('hide')}
 function closeMenu(){$('menuDrawer').classList.add('hide')}
 $('menuBtn').onclick=openMenu;
@@ -1350,8 +1461,40 @@ $('clearHistBtn').onclick=()=>{
   if(!confirm('এই device-এর সব saved exam history মুছে ফেলবে?'))return;
   const p=loadProfile();p.exams=[];saveProfile(p);renderHistory();
 };
+const ACTIVE_KEY='mock_exam_active_v1';
+function saveActiveExam(){
+  if(!cfg||!cfg.parts||$('exam').classList.contains('hide'))return;
+  const rem=paused?pausedRem:Math.max(0,(endAt-Date.now())/1000);
+  try{localStorage.setItem(ACTIVE_KEY,JSON.stringify({id:currentExamId,cfg,part,ans,marks,flags,used,rem:Math.round(rem)}))}catch(e){}
+}
+function clearActiveExam(){
+  try{localStorage.removeItem(ACTIVE_KEY)}catch(e){}
+  $('resumeBanner')?.classList.add('hide');
+}
+function checkActiveExam(){
+  try{
+    const raw=localStorage.getItem(ACTIVE_KEY);if(!raw)return;
+    const s=JSON.parse(raw);if(!s||!s.cfg||!Array.isArray(s.cfg.parts))return;
+    const P=s.cfg.parts[s.part||0];
+    $('resumeMeta').textContent=`${s.cfg.examName?s.cfg.examName+' · ':''}${s.cfg.name} · ${P?P.label:'Part 1'} (${fmt(s.rem||0)} বাকি)`;
+    $('resumeBanner').classList.remove('hide');
+    $('resumeExamBtn').onclick=()=>{
+      $('resumeBanner').classList.add('hide');
+      currentExamId=s.id||('ex_'+Date.now().toString(36));
+      cfg=s.cfg;ans=s.ans||cfg.parts.map(()=>[]);marks=s.marks||cfg.parts.map(()=>[]);flags=s.flags||cfg.parts.map(()=>[]);used=s.used||cfg.parts.map(()=>0);
+      if(cfg.parts.some(p=>p.pages&&p.pages.length)&&!pdf&&!cfg.driveId){
+        cfg.parts.forEach(p=>p.pages=[]);
+        toast('Refresh-এর কারণে local PDF পাওয়া যায়নি; Answer Sheet চালু হয়েছে।');
+      }
+      $('driveWrap').innerHTML='';$('driveWrap').classList.add('hide');$('pages').classList.remove('hide');
+      $('setup').classList.add('hide');$('report').classList.add('hide');$('listenReview').classList.add('hide');$('exam').classList.remove('hide');
+      startPart(s.part||0,false,s.rem);
+    };
+    $('discardExamBtn').onclick=()=>clearActiveExam();
+  }catch(e){}
+}
 function goHome(){
-  stopYt();clearInterval(tick);
+  stopYt();clearInterval(tick);clearActiveExam();
   $('exam').classList.add('hide');$('listenReview').classList.add('hide');$('report').classList.add('hide');
   $('setup').classList.remove('hide');
   if(location.hash.startsWith('#r='))history.replaceState(null,'',location.pathname+location.search);
@@ -1396,6 +1539,7 @@ function checkHashReview(){
   if(p.name&&!$('name').value)$('name').value=p.name;
   renderHistory();
   checkHashReview();
+  if($('setup').classList.contains('hide')===false)checkActiveExam();
   window.addEventListener('hashchange',checkHashReview);
 })();
 </script>
