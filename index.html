@@ -7,7 +7,8 @@
 <title>Mock Exam</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#18181b;--mu:#6b7280;--bd:#e2e4e9;--ac:#2563eb;--ac-soft:#eff6ff;--acx:#fff;--ok:#16a34a;--bad:#dc2626;--sh:0 2px 10px rgba(0,0,0,.04)}
-@media (prefers-color-scheme:dark){:root{--bg:#121316;--card:#1c1e24;--tx:#f3f4f6;--mu:#9ca3af;--bd:#2e323c;--ac:#60a5fa;--ac-soft:#1e293b;--acx:#0f172a;--ok:#22c55e;--bad:#f87171;--sh:0 2px 10px rgba(0,0,0,.25)}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121316;--card:#1c1e24;--tx:#f3f4f6;--mu:#9ca3af;--bd:#2e323c;--ac:#60a5fa;--ac-soft:#1e293b;--acx:#0f172a;--ok:#22c55e;--bad:#f87171;--sh:0 2px 10px rgba(0,0,0,.25)}}
+:root[data-theme="dark"]{--bg:#121316;--card:#1c1e24;--tx:#f3f4f6;--mu:#9ca3af;--bd:#2e323c;--ac:#60a5fa;--ac-soft:#1e293b;--acx:#0f172a;--ok:#22c55e;--bad:#f87171;--sh:0 2px 10px rgba(0,0,0,.25)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,sans-serif}
 .wrap{max-width:640px;margin:0 auto;padding:20px}
@@ -139,6 +140,15 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 .key-bar{display:flex;gap:8px;margin:8px 0 10px;flex-wrap:wrap}
 .key-bar input{flex:1;min-width:180px;padding:8px 10px;font-size:13px}
 .key-bar button{padding:8px 12px;font-size:13px;white-space:nowrap}
+.home-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px}
+.menu-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-size:20px;box-shadow:var(--sh);flex-shrink:0}
+.menu-badge{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--ac);color:var(--acx);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.drawer-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:flex;justify-content:flex-end}
+.drawer{width:min(380px,92vw);height:100%;background:var(--card);border-left:1px solid var(--bd);display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(0,0,0,.25)}
+.drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--bd)}
+.drawer-bd{flex:1;overflow:auto;padding:14px 16px}
+.menu-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.menu-acts button{width:100%;padding:9px 10px;font-size:13px;text-align:center}
 </style>
 </head>
 <body>
@@ -153,8 +163,13 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     </div>
     <div class="mu">For any suggestion and changes, contact him</div>
   </div>
-  <h1>Mock Exam</h1>
-  <div class="mu">Question PDF upload করো, নাম লেখো, তারপর Start।</div>
+  <div class="home-hd">
+    <div>
+      <h1>Mock Exam</h1>
+      <div class="mu">Question PDF upload করো, নাম লেখো, তারপর Start।</div>
+    </div>
+    <button type="button" class="menu-btn" id="menuBtn" title="Menu & History">☰<span class="menu-badge hide" id="menuBadge">0</span></button>
+  </div>
 
   <label>তোমার নাম</label>
   <input id="name" placeholder="Name">
@@ -202,24 +217,38 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     </div>
     <button class="btn sec" id="onlyListenBtn" style="width:100%;margin-top:12px;border-color:var(--ac);color:var(--ac);font-weight:700">Start Only Listening</button>
   </div>
+</div>
 
-  <div class="card" id="historyCard" style="margin-top:18px">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-      <div>
-        <h3 style="margin:0">My Exams & Answer Check</h3>
-        <div class="mu" id="profileStats">Saved Name: — · Total Exams: 0</div>
-      </div>
-      <div>
-        <input type="file" id="importPngInput" accept="image/png" class="hide">
-        <button type="button" class="btn sec" id="importPngBtn" style="padding:8px 12px;font-size:13px">Upload Report PNG</button>
-      </div>
+<div id="menuDrawer" class="drawer-bg hide">
+  <div class="drawer">
+    <div class="drawer-hd">
+      <strong>Menu & Exam History</strong>
+      <button type="button" class="btn sec" id="menuCloseBtn" style="padding:5px 10px">✕</button>
     </div>
-    <div id="historyList" style="margin-top:6px"></div>
+    <div class="drawer-bd">
+      <div class="card" style="margin-top:0">
+        <div style="font-weight:700;font-size:15px" id="profileNameDisp">Student</div>
+        <div class="mu" id="profileStats" style="margin-top:2px">Total Exams: 0</div>
+        <input type="file" id="importPngInput" accept="image/png" class="hide">
+        <input type="file" id="importBackupInput" accept="application/json,.json" class="hide">
+        <div class="menu-acts">
+          <button type="button" class="btn sec" id="importPngBtn">Upload Report PNG</button>
+          <button type="button" class="btn sec" id="pasteLinkBtn">Open Review Link</button>
+          <button type="button" class="btn sec" id="themeBtn">Theme: Auto</button>
+          <button type="button" class="btn sec" id="exportBackupBtn">Export Backup</button>
+          <button type="button" class="btn sec" id="importBackupBtn">Import Backup</button>
+          <button type="button" class="btn sec" id="clearHistBtn" style="color:var(--bad)">Clear History</button>
+        </div>
+      </div>
+      <div style="margin-top:14px;font-weight:700;font-size:14px">Recent Exams</div>
+      <div id="historyList" style="margin-top:6px"></div>
+    </div>
   </div>
 </div>
 
 <div id="exam" class="hide show-q">
   <div class="top">
+    <button class="btn sec" id="examHomeBtn" title="Back to Home" style="padding:6px 10px;font-size:13px">⌂ Home</button>
     <strong id="partLabel">Part 1</strong>
     <span class="mu" id="progress"></span>
     <span class="t" id="timer">20:00</span>
@@ -1217,7 +1246,16 @@ function extractPngText(buf,key){
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function renderHistory(){
   const p=loadProfile(),exams=Array.isArray(p.exams)?p.exams:[];
-  $('profileStats').textContent=`Saved Name: ${p.name||'—'} · Total Exams: ${exams.length}`;
+  let gradedCnt=0,pctSum=0;
+  exams.forEach(ex=>{
+    let totQ=0,ok=0,bad=0;
+    ex.p.forEach(x=>{totQ+=x.q;for(const c of (x.k||'')){if(c==='o')ok++;else if(c==='x')bad++}});
+    if((ok+bad)>0&&totQ){gradedCnt++;pctSum+=Math.round(ok*100/totQ)}
+  });
+  $('profileNameDisp').textContent=p.name||'Guest (নাম সেভ করা নেই)';
+  $('profileStats').textContent=`Total Exams: ${exams.length} · Graded: ${gradedCnt}`+(gradedCnt?` · Avg: ${Math.round(pctSum/gradedCnt)}%`:'');
+  $('menuBadge').textContent=exams.length;
+  $('menuBadge').classList.toggle('hide',!exams.length);
   const list=$('historyList');
   if(!exams.length){list.innerHTML='<div class="mu" style="margin-top:6px">এখনো কোনো exam save হয়নি। Exam দিলে এখানে auto-save থাকবে।</div>';return}
   list.innerHTML=exams.map((ex,idx)=>{
@@ -1239,6 +1277,7 @@ function renderHistory(){
   }).join('');
   list.querySelectorAll('.hist-open').forEach(b=>b.onclick=()=>{
     const ex=loadProfile().exams[+b.dataset.i];if(!ex)return;
+    closeMenu();
     applyExamRecord(ex);
     const hasMarks=cfg.parts.some((_,i)=>markStats(i).has);
     if(hasMarks)showReport(true);else openReview(-1);
@@ -1247,6 +1286,64 @@ function renderHistory(){
     const pr=loadProfile();pr.exams.splice(+b.dataset.i,1);saveProfile(pr);renderHistory();
   });
 }
+function openMenu(){renderHistory();$('menuDrawer').classList.remove('hide')}
+function closeMenu(){$('menuDrawer').classList.add('hide')}
+$('menuBtn').onclick=openMenu;
+$('menuCloseBtn').onclick=closeMenu;
+$('menuDrawer').onclick=e=>{if(e.target===$('menuDrawer'))closeMenu()};
+$('examHomeBtn').onclick=()=>{if(confirm('Exam থেকে বের হয়ে Home-এ যাবে?'))goHome()};
+const THEME_KEY='mock_exam_theme_v1';
+function applyTheme(t){
+  if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);
+  else{t='auto';document.documentElement.removeAttribute('data-theme')}
+  try{localStorage.setItem(THEME_KEY,t)}catch(e){}
+  $('themeBtn').textContent='Theme: '+(t==='dark'?'Dark':t==='light'?'Light':'Auto');
+}
+$('themeBtn').onclick=()=>{
+  const cur=localStorage.getItem(THEME_KEY)||'auto';
+  applyTheme(cur==='auto'?'dark':cur==='dark'?'light':'auto');
+};
+$('pasteLinkBtn').onclick=()=>{
+  const raw=prompt('Review Link অথবা #r=... অংশটি paste করো:');
+  if(!raw)return;
+  const idx=raw.indexOf('#r=');
+  const tok=(idx>=0?raw.slice(idx+3):raw).trim();
+  try{
+    applyExamRecord(decodeExamState(tok));
+    saveCurrentExamToHistory();
+    closeMenu();
+    openReview(-1);
+  }catch(e){toast('Review link-টি সঠিক নয়।')}
+};
+$('exportBackupBtn').onclick=()=>{
+  const data=JSON.stringify(loadProfile(),null,2);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+  a.download='mock_exam_backup.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+};
+$('importBackupBtn').onclick=()=>$('importBackupInput').click();
+$('importBackupInput').onchange=async()=>{
+  const f=$('importBackupInput').files[0];$('importBackupInput').value='';
+  if(!f)return;
+  try{
+    const inc=JSON.parse(await f.text());
+    if(!inc||!Array.isArray(inc.exams))throw new Error('Invalid backup');
+    const cur=loadProfile();if(!Array.isArray(cur.exams))cur.exams=[];
+    const seen=new Set(cur.exams.map(x=>x.id));
+    for(const ex of inc.exams)if(ex&&ex.id&&!seen.has(ex.id)){cur.exams.push(ex);seen.add(ex.id)}
+    if(!cur.name&&inc.name)cur.name=inc.name;
+    saveProfile(cur);
+    if(cur.name&&!$('name').value)$('name').value=cur.name;
+    renderHistory();
+    toast('Backup import হয়েছে!');
+  }catch(e){toast('Backup file-টি সঠিক নয়।')}
+};
+$('clearHistBtn').onclick=()=>{
+  if(!confirm('এই device-এর সব saved exam history মুছে ফেলবে?'))return;
+  const p=loadProfile();p.exams=[];saveProfile(p);renderHistory();
+};
 function goHome(){
   stopYt();clearInterval(tick);
   $('exam').classList.add('hide');$('listenReview').classList.add('hide');$('report').classList.add('hide');
@@ -1275,6 +1372,7 @@ $('importPngInput').onchange=async()=>{
     if(!raw){toast('এই PNG-তে Report Data পাওয়া যায়নি (WhatsApp/Messenger-এ পাঠালে data মুছে যায়)। Custom Review Link অথবা Recent Exams ব্যবহার করো।');return}
     applyExamRecord(decodeExamState(raw));
     saveCurrentExamToHistory();
+    closeMenu();
     openReview(-1);
   }catch(e){toast('PNG load করা যায়নি: '+e.message)}
 };
@@ -1287,6 +1385,7 @@ function checkHashReview(){
   }catch(e){toast('Review link-টি সঠিক নয় বা ভেঙে গেছে।')}
 }
 (()=>{
+  applyTheme(localStorage.getItem(THEME_KEY)||'auto');
   const p=loadProfile();
   if(p.name&&!$('name').value)$('name').value=p.name;
   renderHistory();
