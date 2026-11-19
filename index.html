@@ -817,8 +817,8 @@ function openReview(pIdx){
     const {ok,bad,has}=markStats(pi);
     html+=`<div class="card"><h3>${P.label}${has?` <span style="font-size:13px;font-weight:600;margin-left:6px"><span style="color:var(--ok)">✓ ${ok}</span> · <span style="color:var(--bad)">✕ ${bad}</span></span>`:''}</h3>
       <div class="key-bar">
-        <input class="key-in" data-p="${pi}" placeholder="Answer key paste করো (যেমন: 1 3 2 4 বা ABCD)">
-        <button type="button" class="btn sec key-btn" data-p="${pi}">Auto-Check</button>
+        <input class="key-in" data-p="${pi}" data-start="1" data-len="${P.q}" placeholder="${P.listen?`সব ${P.q}টা Listening key একসাথে (বা নিচে Mondai অনুযায়ী)`:`Answer key paste করো (যেমন: 1 3 2 4 বা ABCD)`}">
+        <button type="button" class="btn sec key-btn" data-p="${pi}" data-start="1" data-len="${P.q}">Auto-Check</button>
       </div>`;
     if(P.listen){
       let marked=0,missingGroups=[],q=0;
@@ -841,7 +841,12 @@ function openReview(pIdx){
       }
       q=0;
       for(const md of LISTEN_MONDAI){
-        html+=`<div class="mondai-hd">Mondai ${md.m}</div>`;
+        const startIdx=q+1;
+        html+=`<div class="mondai-hd">Mondai ${md.m} (${md.q}টি)</div>
+        <div class="key-bar" style="margin:6px 0">
+          <input class="key-in" data-p="${pi}" data-start="${startIdx}" data-len="${md.q}" placeholder="Mondai ${md.m} key (${md.q}টা, e.g. 1 3 2...)">
+          <button type="button" class="btn sec key-btn" data-p="${pi}" data-start="${startIdx}" data-len="${md.q}">Check M${md.m}</button>
+        </div>`;
         for(let j=1;j<=md.q;j++){
           const idx=++q;
           html+=lrRowHtml(pi,idx,j,A[idx],M[idx]);
@@ -868,17 +873,18 @@ function openReview(pIdx){
   });
   $('lrBody').querySelectorAll('.key-btn').forEach(btn=>{
     btn.onclick=()=>{
-      const pi=+btn.dataset.p,P=cfg.parts[pi];
-      const raw=$('lrBody').querySelector(`.key-in[data-p="${pi}"]`).value;
+      const pi=+btn.dataset.p,start=+(btn.dataset.start||1),len=+(btn.dataset.len||cfg.parts[pi].q),P=cfg.parts[pi];
+      const raw=$('lrBody').querySelector(`.key-in[data-p="${pi}"][data-start="${start}"]`).value;
       const keys=parseKeyTokens(raw);
       if(!keys.length){toast('সঠিক Answer Key দাও (1-4 অথবা A-D)।');return}
-      const n=Math.min(P.q,keys.length);
-      for(let q=1;q<=n;q++){
-        marks[pi][q]=ans[pi][q]===keys[q-1]?'ok':'bad';
+      const n=Math.min(len,keys.length,P.q-start+1);
+      for(let k=0;k<n;k++){
+        const q=start+k;
+        marks[pi][q]=ans[pi][q]===keys[k]?'ok':'bad';
       }
       saveCurrentExamToHistory();
       openReview(lrPartIdx);
-      toast(`${P.label}-এর ${n}টি প্রশ্ন Auto-Check হয়েছে!`);
+      toast(`${n}টি প্রশ্ন Auto-Check হয়েছে!`);
     };
   });
   updLrProg();
