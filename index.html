@@ -208,7 +208,10 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   <input id="gdrive" type="url" placeholder="https://drive.google.com/file/d/.../view">
   <div id="detect" class="mu" style="margin-top:6px"></div>
 
-  <div class="presets">
+  <label>Exam Type</label>
+  <select id="partsMode"><option value="2">2 Parts (Part 1 + Part 2)</option><option value="1">1 Part Only</option></select>
+
+  <div class="presets" id="presetsWrap">
     <button type="button" class="preset-btn" id="preset43">43 Questions<br><span style="font-weight:500;font-size:11px">21q (20m) + 22q (40m)</span></button>
     <button type="button" class="preset-btn" id="preset67">67 Questions<br><span style="font-weight:500;font-size:11px">35q (25m) + 32q (50m)</span></button>
   </div>
@@ -222,7 +225,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     <div style="margin-top:8px"><div class="mu">PDF pages</div><input id="p1pages" placeholder="auto (e.g. 2-6)"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="p2Card">
     <h3>Part 2 <span class="mu">(Questions সংখ্যা নিজে দাও)</span></h3>
     <div class="row">
       <div><div class="mu">Questions</div><div class="step"><button data-t="p2q" data-d="-1">−</button><input id="p2q" type="number" min="1" placeholder="e.g. 22"><button data-t="p2q" data-d="1">+</button></div></div>
@@ -579,31 +582,38 @@ function beginExam(name,driveId,parts,examName,ytId){
   startPart(0);
 }
 
+$('partsMode').onchange=()=>{
+  const one=$('partsMode').value==='1';
+  $('p2Card').classList.toggle('hide',one);
+  $('presetsWrap').classList.toggle('hide',one);
+};
+
 $('startBtn').onclick=async()=>{
   $('err').textContent='';
   const name=$('name').value.trim(),f=$('file').files[0],driveId=driveIdOf($('gdrive').value);
   const customEx=$('examNameIn').value.trim();
+  const one=$('partsMode').value==='1',idxs=one?[1]:[1,2];
   if(!name){$('err').textContent='নাম লেখো।';return}
   if(!f&&!driveId){$('err').textContent='PDF select করো অথবা Google Drive link দাও।';return}
   if(driveId&&!f){
-    for(const i of [1,2])if(!$('p'+i+'q').value){$('err').textContent='Part '+i+' এর Questions সংখ্যা দাও।';return}
-    const parts=[0,1].map(i=>({
-      label:'Part '+(i+1),listen:false,pages:[],
-      q:Math.max(1,+$('p'+(i+1)+'q').value||1),
-      m:Math.max(1,+$('p'+(i+1)+'m').value||(i?40:20))}));
+    for(const i of idxs)if(!$('p'+i+'q').value){$('err').textContent='Part '+i+' এর Questions সংখ্যা দাও।';return}
+    const parts=idxs.map(i=>({
+      label:one?'Exam':'Part '+i,listen:false,pages:[],
+      q:Math.max(1,+$('p'+i+'q').value||1),
+      m:Math.max(1,+$('p'+i+'m').value||(i===2?40:20))}));
     beginExam(name,driveId,parts,customEx);
     return;
   }
-  for(const i of [1,2])if(!$('p'+i+'pages').value||!$('p'+i+'q').value){$('err').textContent='Part '+i+' এর Questions বা PDF pages ফাঁকা।';return}
+  for(const i of idxs)if(!$('p'+i+'pages').value||!$('p'+i+'q').value){$('err').textContent='Part '+i+' এর Questions বা PDF pages ফাঁকা।';return}
   $('startBtn').textContent='Loading…';
   try{
     if(!pdf){await setWorker();pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise}
   }catch(e){$('err').textContent='PDF load হয়নি: '+e.message;$('startBtn').textContent='Start Exam';return}
-  const parts=[0,1].map(i=>({
-    label:'Part '+(i+1),listen:false,
-    pages:parsePages($('p'+(i+1)+'pages').value,pdf.numPages),
-    q:Math.max(1,+$('p'+(i+1)+'q').value||1),
-    m:Math.max(1,+$('p'+(i+1)+'m').value||(i?40:20))}));
+  const parts=idxs.map(i=>({
+    label:one?'Exam':'Part '+i,listen:false,
+    pages:parsePages($('p'+i+'pages').value,pdf.numPages),
+    q:Math.max(1,+$('p'+i+'q').value||1),
+    m:Math.max(1,+$('p'+i+'m').value||(i===2?40:20))}));
   beginExam(name,'',parts,customEx||f.name.replace(/\.pdf$/i,''));
 };
 
