@@ -2,7 +2,7 @@
 <html lang="bn">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Mock Exam</title>
 <style>
@@ -676,10 +676,11 @@ async function startPart(i,auto,resumeSec){
   if(auto)toast(cfg.parts[i-1].label+'-এর সময় শেষ! '+P.label+' শুরু হয়েছে।');
   if(usePad){$('pages').classList.remove('hide');$('driveWrap').classList.add('hide');return}
   if(cfg.driveId){
-    document.querySelector('.zoom')?.classList.add('hide');
+    document.querySelector('.zoom')?.classList.remove('hide');
     $('pages').classList.add('hide');
     $('driveWrap').classList.remove('hide');
-    if(!$('driveWrap').querySelector('iframe'))$('driveWrap').innerHTML=`<iframe src="https://drive.google.com/file/d/${cfg.driveId}/preview" style="width:100%;height:100%;border:0;background:#fff" allow="autoplay"></iframe>`;
+    if(!$('driveWrap').querySelector('iframe'))$('driveWrap').innerHTML=`<div id="driveScroll" style="width:100%;height:100%;overflow:auto;-webkit-overflow-scrolling:touch"><iframe id="driveFrame" src="https://drive.google.com/file/d/${cfg.driveId}/preview" style="width:100%;height:100%;border:0;background:#fff;display:block" allow="autoplay"></iframe></div>`;
+    applyZoom(1);
     return;
   }
   $('driveWrap').classList.add('hide');
@@ -719,12 +720,17 @@ async function renderPages(list){
   }
   $('pages').replaceChildren(...els);
 }
-function applyZoom(z){zoom=Math.min(4,Math.max(1,z));$('pages').style.width=(zoom*100)+'%'}
+function applyZoom(z){
+  zoom=Math.min(4,Math.max(1,z));
+  $('pages').style.width=(zoom*100)+'%';
+  const df=$('driveFrame');
+  if(df){df.style.width=(zoom*100)+'%';df.style.height=(zoom*100)+'%'}
+}
 function setZoom(z,cx,cy){
-  const pane=$('qpane'),old=zoom;applyZoom(z);const r=zoom/old;
+  const pane=cfg?.driveId&&$('driveScroll')?$('driveScroll'):$('qpane'),old=zoom;applyZoom(z);const r=zoom/old;
   if(cx===undefined){cx=pane.clientWidth/2;cy=pane.clientHeight/2}
   pane.scrollLeft=(pane.scrollLeft+cx)*r-cx;pane.scrollTop=(pane.scrollTop+cy)*r-cy;
-  clearTimeout(rzTimer);rzTimer=setTimeout(()=>renderPages(partPages),350);
+  if(!cfg?.driveId){clearTimeout(rzTimer);rzTimer=setTimeout(()=>renderPages(partPages),350)}
 }
 $('zIn').onclick=()=>setZoom(zoom*1.25);$('zOut').onclick=()=>setZoom(zoom/1.25);$('zFit').onclick=()=>{setZoom(1);$('qpane').scrollLeft=0};
 (()=>{
