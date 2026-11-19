@@ -128,6 +128,17 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 .lr-rw button{width:44px;height:38px;border:1px solid var(--bd);border-radius:9px;background:var(--card);color:var(--mu);font-size:17px;font-weight:800}
 .lr-rw button.ok.sel{background:var(--ok);border-color:var(--ok);color:#fff}
 .lr-rw button.bad.sel{background:var(--bad);border-color:var(--bad);color:#fff}
+.hist-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);margin-top:8px}
+.hist-info{min-width:0;flex:1}
+.hist-title{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-meta{font-size:12px;color:var(--mu);margin-top:2px}
+.hist-acts{display:flex;gap:6px;flex-shrink:0}
+.badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:700}
+.badge.ok{background:rgba(22,163,74,.14);color:var(--ok)}
+.badge.pend{background:var(--ac-soft);color:var(--ac)}
+.key-bar{display:flex;gap:8px;margin:8px 0 10px;flex-wrap:wrap}
+.key-bar input{flex:1;min-width:180px;padding:8px 10px;font-size:13px}
+.key-bar button{padding:8px 12px;font-size:13px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -191,6 +202,20 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     </div>
     <button class="btn sec" id="onlyListenBtn" style="width:100%;margin-top:12px;border-color:var(--ac);color:var(--ac);font-weight:700">Start Only Listening</button>
   </div>
+
+  <div class="card" id="historyCard" style="margin-top:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div>
+        <h3 style="margin:0">My Exams & Answer Check</h3>
+        <div class="mu" id="profileStats">Saved Name: — · Total Exams: 0</div>
+      </div>
+      <div>
+        <input type="file" id="importPngInput" accept="image/png" class="hide">
+        <button type="button" class="btn sec" id="importPngBtn" style="padding:8px 12px;font-size:13px">Upload Report PNG</button>
+      </div>
+    </div>
+    <div id="historyList" style="margin-top:6px"></div>
+  </div>
 </div>
 
 <div id="exam" class="hide show-q">
@@ -210,7 +235,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   </div>
   <div class="yt-top hide" id="ytTopWrap"></div>
   <div class="main">
-    <div class="qpane" id="qpane"><div id="pages"></div></div>
+    <div class="qpane" id="qpane"><div id="pages"></div><div id="driveWrap" class="hide" style="width:100%;height:100%"></div></div>
     <div class="zoom"><button id="zIn">+</button><button id="zOut">−</button><button id="zFit" style="font-size:14px">Fit</button></div>
   </div>
   <div class="dock">
@@ -230,10 +255,12 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   <div class="mu" id="repName"></div>
   <div id="repBody"></div>
   <div class="row noprint" style="margin-top:16px;flex-wrap:wrap">
-    <button class="btn" id="imgBtn" style="margin-top:0;flex:1 1 160px">Save Image (PNG)</button>
+    <button class="btn" id="checkAnsBtn" style="margin-top:0;flex:1 1 180px">Check / Grade Answers</button>
+    <button class="btn sec" id="copyLinkBtn" style="flex:1 1 150px">Copy Review Link</button>
+    <button class="btn sec" id="imgBtn" style="flex:1 1 150px">Save Image (PNG)</button>
     <button class="btn sec" id="copyBtn">Copy text</button>
     <button class="btn sec" id="printBtn">Print / Save PDF</button>
-    <button class="btn sec" onclick="location.reload()">New exam</button>
+    <button class="btn sec" id="newExamBtn">New exam</button>
   </div>
 </div>
 
@@ -260,10 +287,13 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 </div>
 
 <div id="listenReview" class="hide">
-  <div class="top" style="position:sticky;top:0;z-index:10">
-    <strong>Listening Review</strong>
+  <div class="top" style="position:sticky;top:0;z-index:10;flex-wrap:wrap">
+    <strong id="lrTitle">Answer Check</strong>
     <span class="mu" id="lrProg"></span>
-    <button class="btn" id="lrShowReportBtn" style="width:auto;margin:0 0 0 auto;padding:8px 14px">Show Report</button>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn sec" id="lrHomeBtn" style="padding:8px 12px">Home</button>
+      <button class="btn" id="lrShowReportBtn" style="width:auto;margin:0;padding:8px 14px">Show Final Report</button>
+    </div>
   </div>
   <div class="wrap" id="lrBody" style="padding-bottom:32px"></div>
 </div>
@@ -441,12 +471,17 @@ $('gdrive').oninput=()=>{
 };
 document.querySelectorAll('.step button').forEach(b=>b.onclick=()=>{const i=$(b.dataset.t);i.value=Math.max(1,(+i.value||0)+ +b.dataset.d)});
 
+let currentExamId='';
 function beginExam(name,driveId,parts,examName,ytId){
+  saveProfileName(name);
+  currentExamId='ex_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
+  repTime='';
   cfg={name,driveId,examName:examName||'',ytId:ytId||'',style:$('style').value,parts};
   ans=parts.map(()=>[]);
   marks=parts.map(()=>[]);
   used=parts.map(()=>0);
-  $('setup').classList.add('hide');$('exam').classList.remove('hide');
+  $('driveWrap').innerHTML='';$('driveWrap').classList.add('hide');$('pages').classList.remove('hide');
+  $('setup').classList.add('hide');$('report').classList.add('hide');$('listenReview').classList.add('hide');$('exam').classList.remove('hide');
   startPart(0);
 }
 
@@ -536,13 +571,17 @@ async function startPart(i,auto){
   limit=P.m*60;endAt=Date.now()+limit*1000;
   clearInterval(tick);tick=setInterval(onTick,250);onTick();
   if(auto)toast(cfg.parts[i-1].label+'-এর সময় শেষ! '+P.label+' শুরু হয়েছে।');
-  if(usePad)return;
+  if(usePad){$('pages').classList.remove('hide');$('driveWrap').classList.add('hide');return}
   if(cfg.driveId){
-    document.querySelector('.zoom').classList.add('hide');
-    if(!$('qpane').querySelector('iframe'))$('qpane').innerHTML=`<iframe src="https://drive.google.com/file/d/${cfg.driveId}/preview" style="width:100%;height:100%;border:0;background:#fff" allow="autoplay"></iframe>`;
+    document.querySelector('.zoom')?.classList.add('hide');
+    $('pages').classList.add('hide');
+    $('driveWrap').classList.remove('hide');
+    if(!$('driveWrap').querySelector('iframe'))$('driveWrap').innerHTML=`<iframe src="https://drive.google.com/file/d/${cfg.driveId}/preview" style="width:100%;height:100%;border:0;background:#fff" allow="autoplay"></iframe>`;
     return;
   }
-  document.querySelector('.zoom').classList.remove('hide');
+  $('driveWrap').classList.add('hide');
+  $('pages').classList.remove('hide');
+  document.querySelector('.zoom')?.classList.remove('hide');
   $('qpane').scrollTop=0;partPages=P.pages;applyZoom(1);await renderPages(partPages);
 }
 
@@ -698,94 +737,141 @@ function finishPart(auto){
     const M=marks[part]||[];
     let marked=0;
     for(let q=1;q<=LISTEN_TOTAL;q++)if(M[q]==='ok'||M[q]==='bad')marked++;
-    if($('listenMode').value==='later'||marked<LISTEN_TOTAL)openListenReview(part);
+    if($('listenMode').value==='later'||marked<LISTEN_TOTAL)openReview(part);
     else showReport();
   }else showReport();
 }
 let lrPartIdx=-1;
-function lrRowHtml(idx,j,val,mk){
+function lrRowHtml(pi,idx,j,val,mk){
   const a=val?lbl(val):'—';
-  return `<div class="lr-row" data-q="${idx}">
+  return `<div class="lr-row" data-p="${pi}" data-q="${idx}">
     <span class="lr-q">${j})</span>
     <span class="lr-ans${val?'':' empty'}">${val?'উত্তর: '+a:'উত্তর দেওয়া হয়নি (—)'}</span>
     <div class="lr-rw">
-      <button class="ok${mk==='ok'?' sel':''}" data-q="${idx}" data-v="ok" title="Right">✓</button>
-      <button class="bad${mk==='bad'?' sel':''}" data-q="${idx}" data-v="bad" title="Wrong">✕</button>
+      <button class="ok${mk==='ok'?' sel':''}" data-p="${pi}" data-q="${idx}" data-v="ok" title="Right">✓</button>
+      <button class="bad${mk==='bad'?' sel':''}" data-p="${pi}" data-q="${idx}" data-v="bad" title="Wrong">✕</button>
     </div>
   </div>`;
 }
-function updLrProg(){
-  const M=marks[lrPartIdx]||[];
-  let c=0;
-  for(let q=1;q<=LISTEN_TOTAL;q++)if(M[q]==='ok'||M[q]==='bad')c++;
-  $('lrProg').textContent=c+'/'+LISTEN_TOTAL;
+function reviewPartIndices(){
+  return lrPartIdx>=0?[lrPartIdx]:cfg.parts.map((_,i)=>i);
 }
-function openListenReview(pIdx){
+function updLrProg(){
+  let c=0,tot=0;
+  for(const pi of reviewPartIndices()){
+    const P=cfg.parts[pi],M=marks[pi]||[];
+    tot+=P.q;
+    for(let q=1;q<=P.q;q++)if(M[q]==='ok'||M[q]==='bad')c++;
+  }
+  $('lrProg').textContent=c+'/'+tot+' marked';
+}
+function parseKeyTokens(raw){
+  const s=(raw||'').trim();
+  if(!s)return[];
+  const lines=s.split(/[\n;]+/).map(l=>l.replace(/^\s*\d+\s*[.):\-]\s*/,'')).join(' ');
+  const out=[];
+  for(const ch of lines.toUpperCase()){
+    if(ch>='1'&&ch<='4')out.push(+ch);
+    else if(ch>='A'&&ch<='D')out.push(ch.charCodeAt(0)-64);
+  }
+  return out;
+}
+function openReview(pIdx){
   stopYt();
   lrPartIdx=pIdx;
-  $('exam').classList.add('hide');
+  $('setup').classList.add('hide');$('exam').classList.add('hide');$('report').classList.add('hide');
   $('listenReview').classList.remove('hide');
-  const A=ans[pIdx]||[],M=marks[pIdx]||[];
-  let marked=0,missingGroups=[];
-  let q=0;
-  for(const md of LISTEN_MONDAI){
-    const items=[];
-    for(let j=1;j<=md.q;j++){
-      const idx=++q;
-      if(M[idx]==='ok'||M[idx]==='bad')marked++;
-      else items.push({idx,j});
-    }
-    if(items.length)missingGroups.push({m:md.m,items});
-  }
+  $('lrTitle').textContent=pIdx>=0?cfg.parts[pIdx].label+' Review':'Answer Check / Grading';
   let html='';
-  if(marked>0&&missingGroups.length){
-    html+=`<div class="card" style="border-color:var(--bad)"><h3 style="color:var(--bad)">বাকি আছে (Unmarked)</h3><div class="mu" style="margin-bottom:6px">নিচের প্রশ্নগুলোর Right / Wrong সিলেক্ট করা হয়নি:</div>`;
-    for(const g of missingGroups){
-      html+=`<div class="mondai-hd">Mondai ${g.m}</div>`;
-      for(const it of g.items)html+=lrRowHtml(it.idx,it.j,A[it.idx],M[it.idx]);
-    }
-    html+=`</div>`;
-  }
-  q=0;
-  for(const md of LISTEN_MONDAI){
-    html+=`<div class="card"><h3>Mondai ${md.m}</h3>`;
-    for(let j=1;j<=md.q;j++){
-      const idx=++q;
-      html+=lrRowHtml(idx,j,A[idx],M[idx]);
+  for(const pi of reviewPartIndices()){
+    const P=cfg.parts[pi],A=ans[pi]||[],M=marks[pi]||[];
+    const {ok,bad,has}=markStats(pi);
+    html+=`<div class="card"><h3>${P.label}${has?` <span style="font-size:13px;font-weight:600;margin-left:6px"><span style="color:var(--ok)">✓ ${ok}</span> · <span style="color:var(--bad)">✕ ${bad}</span></span>`:''}</h3>
+      <div class="key-bar">
+        <input class="key-in" data-p="${pi}" placeholder="Answer key paste করো (যেমন: 1 3 2 4 বা ABCD)">
+        <button type="button" class="btn sec key-btn" data-p="${pi}">Auto-Check</button>
+      </div>`;
+    if(P.listen){
+      let marked=0,missingGroups=[],q=0;
+      for(const md of LISTEN_MONDAI){
+        const items=[];
+        for(let j=1;j<=md.q;j++){
+          const idx=++q;
+          if(M[idx]==='ok'||M[idx]==='bad')marked++;
+          else items.push({idx,j});
+        }
+        if(items.length)missingGroups.push({m:md.m,items});
+      }
+      if(marked>0&&missingGroups.length){
+        html+=`<div style="border:1px solid var(--bad);border-radius:10px;padding:10px;margin-bottom:10px"><div style="color:var(--bad);font-weight:700;font-size:13px">বাকি আছে (Unmarked)</div>`;
+        for(const g of missingGroups){
+          html+=`<div class="mondai-hd">Mondai ${g.m}</div>`;
+          for(const it of g.items)html+=lrRowHtml(pi,it.idx,it.j,A[it.idx],M[it.idx]);
+        }
+        html+=`</div>`;
+      }
+      q=0;
+      for(const md of LISTEN_MONDAI){
+        html+=`<div class="mondai-hd">Mondai ${md.m}</div>`;
+        for(let j=1;j<=md.q;j++){
+          const idx=++q;
+          html+=lrRowHtml(pi,idx,j,A[idx],M[idx]);
+        }
+      }
+    }else{
+      for(let q=1;q<=P.q;q++)html+=lrRowHtml(pi,q,q,A[q],M[q]);
     }
     html+=`</div>`;
   }
   $('lrBody').innerHTML=html;
   $('lrBody').querySelectorAll('.lr-rw button').forEach(b=>{
     b.onclick=()=>{
-      const idx=+b.dataset.q,v=b.dataset.v;
-      marks[lrPartIdx][idx]=marks[lrPartIdx][idx]===v?undefined:v;
-      const curM=marks[lrPartIdx][idx];
-      $('lrBody').querySelectorAll(`.lr-row[data-q="${idx}"]`).forEach(row=>{
+      const pi=+b.dataset.p,idx=+b.dataset.q,v=b.dataset.v;
+      marks[pi][idx]=marks[pi][idx]===v?undefined:v;
+      const curM=marks[pi][idx];
+      $('lrBody').querySelectorAll(`.lr-row[data-p="${pi}"][data-q="${idx}"]`).forEach(row=>{
         row.querySelector('.ok').classList.toggle('sel',curM==='ok');
         row.querySelector('.bad').classList.toggle('sel',curM==='bad');
       });
       updLrProg();
+      saveCurrentExamToHistory();
+    };
+  });
+  $('lrBody').querySelectorAll('.key-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      const pi=+btn.dataset.p,P=cfg.parts[pi];
+      const raw=$('lrBody').querySelector(`.key-in[data-p="${pi}"]`).value;
+      const keys=parseKeyTokens(raw);
+      if(!keys.length){toast('সঠিক Answer Key দাও (1-4 অথবা A-D)।');return}
+      const n=Math.min(P.q,keys.length);
+      for(let q=1;q<=n;q++){
+        marks[pi][q]=ans[pi][q]===keys[q-1]?'ok':'bad';
+      }
+      saveCurrentExamToHistory();
+      openReview(lrPartIdx);
+      toast(`${P.label}-এর ${n}টি প্রশ্ন Auto-Check হয়েছে!`);
     };
   });
   updLrProg();
   window.scrollTo(0,0);
 }
+$('lrHomeBtn').onclick=()=>goHome();
 $('lrShowReportBtn').onclick=()=>{
-  const M=marks[lrPartIdx]||[];
-  const lines=[];
-  let q=0;
-  for(const md of LISTEN_MONDAI){
-    const miss=[];
-    for(let j=1;j<=md.q;j++){
-      const idx=++q;
-      if(M[idx]!=='ok'&&M[idx]!=='bad')miss.push(j);
+  if(lrPartIdx>=0&&cfg.parts[lrPartIdx]?.listen){
+    const M=marks[lrPartIdx]||[],lines=[];
+    let q=0;
+    for(const md of LISTEN_MONDAI){
+      const miss=[];
+      for(let j=1;j<=md.q;j++){const idx=++q;if(M[idx]!=='ok'&&M[idx]!=='bad')miss.push(j)}
+      if(miss.length)lines.push(`Mondai ${md.m} - ${miss.join(', ')}`);
     }
-    if(miss.length)lines.push(`Mondai ${md.m} - ${miss.join(', ')}`);
+    if(lines.length){
+      $('missingListenList').innerHTML=lines.map(l=>`<div>${l}</div>`).join('');
+      $('missingListenModal').classList.remove('hide');
+      return;
+    }
   }
-  if(!lines.length){showReport();return}
-  $('missingListenList').innerHTML=lines.map(l=>`<div>${l}</div>`).join('');
-  $('missingListenModal').classList.remove('hide');
+  showReport();
 };
 $('forceReportBtn').onclick=()=>{$('missingListenModal').classList.add('hide');showReport()};
 $('backToReviewBtn').onclick=()=>$('missingListenModal').classList.add('hide');
@@ -818,24 +904,26 @@ function markStats(i){
   const ok=M.filter(x=>x==='ok').length,bad=M.filter(x=>x==='bad').length;
   return{M,ok,bad,has:(ok+bad)>0};
 }
-function showReport(){
+function showReport(keepTime){
   stopYt();
-  $('exam').classList.add('hide');$('listenReview').classList.add('hide');$('report').classList.remove('hide');
-  repTime=new Date().toLocaleString();
+  $('setup').classList.add('hide');$('exam').classList.add('hide');$('listenReview').classList.add('hide');$('report').classList.remove('hide');
+  if(!keepTime||!repTime)repTime=new Date().toLocaleString();
+  saveCurrentExamToHistory();
   $('repName').textContent=(cfg.examName?'Exam Name: '+cfg.examName+' · ':'')+cfg.name+' · '+repTime;
   let html='<div class="rep-grid">',txt=`Report Card\n${cfg.examName?'Exam Name: '+cfg.examName+'\n':''}Name: ${cfg.name}\nDate: ${repTime}\n`;
-  let totAns=0,totQ=0,totTime=0;
+  let totAns=0,totQ=0,totTime=0,totOk=0,totBad=0;
   cfg.parts.forEach((P,i)=>{
     const A=ans[i],n=A.filter(Boolean).length,{M,ok,bad,has}=markStats(i);
-    totAns+=n;totQ+=P.q;totTime+=used[i];
+    totAns+=n;totQ+=P.q;totTime+=used[i];totOk+=ok;totBad+=bad;
+    const pct=has?Math.round(ok*100/P.q):0;
     const fullStyle=P.listen&&cfg.parts.length===3?' style="grid-column:1/-1"':'';
     html+=`<div class="rep-card"${fullStyle}><h3>${P.label}</h3>
       <div class="stat"><span>Time used</span><b>${fmt(used[i])} / ${fmt(P.m*60)}</b></div>
       <div class="stat"><span>Answered</span><b>${n} / ${P.q}</b></div>`;
     if(has){
-      html+=`<div class="stat"><span>Right / Wrong</span><b><span style="color:var(--ok)">✓ ${ok}</span> · <span style="color:var(--bad)">✕ ${bad}</span></b></div>`;
+      html+=`<div class="stat"><span>Right / Wrong</span><b><span style="color:var(--ok)">✓ ${ok}</span> · <span style="color:var(--bad)">✕ ${bad}</span> (${pct}%)</b></div>`;
     }
-    txt+=`\n${P.label} — time ${fmt(used[i])} / ${fmt(P.m*60)}, answered ${n}/${P.q}`+(has?`, right ${ok}, wrong ${bad}`:'')+'\n';
+    txt+=`\n${P.label} — time ${fmt(used[i])} / ${fmt(P.m*60)}, answered ${n}/${P.q}`+(has?`, right ${ok}, wrong ${bad} (${pct}%)`:'')+'\n';
     if(P.listen){
       html+=`<div style="margin-top:8px;border-top:1px solid var(--bd);padding-top:4px">`;
       let q=0;
@@ -855,17 +943,23 @@ function showReport(){
     }else{
       html+=`<div class="ans-grid" style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px">`;
       for(let q=1;q<=P.q;q++){
-        const val=A[q],a=val?lbl(val):'—';
-        html+=`<div class="ans-item${val?'':' empty'}"><span>${q})</span><b>${a}</b></div>`;
-        txt+=`${q}) ${a}\n`;
+        const val=A[q],a=val?lbl(val):'—',mk=M[q];
+        const cls=mk==='ok'?' ok':mk==='bad'?' bad':val?'':' empty';
+        const badge=mk==='ok'?' ✓':mk==='bad'?' ✕':'';
+        html+=`<div class="ans-item${cls}"><span>${q})</span><b>${a}${badge}</b></div>`;
+        txt+=`${q}) ${a}${badge}\n`;
       }
       html+='</div>';
     }
     html+='</div>';
   });
-  html+=`</div><div class="card"><div class="stat"><span>Total answered</span><b>${totAns} / ${totQ}</b></div><div class="stat"><span>Total time</span><b>${fmt(totTime)}</b></div></div>`;
-  txt+=`\nTotal answered: ${totAns}/${totQ}\nTotal time: ${fmt(totTime)}`;
+  const hasTot=(totOk+totBad)>0,totPct=hasTot?Math.round(totOk*100/totQ):0;
+  html+=`</div><div class="card"><div class="stat"><span>Total answered</span><b>${totAns} / ${totQ}</b></div>`;
+  if(hasTot)html+=`<div class="stat"><span>Total score</span><b><span style="color:var(--ok)">✓ ${totOk}</span> / ${totQ} · <span style="color:var(--bad)">✕ ${totBad}</span> (${totPct}%)</b></div>`;
+  html+=`<div class="stat"><span>Total time</span><b>${fmt(totTime)}</b></div></div>`;
+  txt+=`\nTotal answered: ${totAns}/${totQ}`+(hasTot?`\nTotal score: ${totOk}/${totQ} (${totPct}%), wrong ${totBad}`:'')+`\nTotal time: ${fmt(totTime)}`;
   reportText=txt;$('repBody').innerHTML=html;
+  window.scrollTo(0,0);
 }
 function saveReportImage(){
   const W=920,pad=28,gap=20,colW=(W-pad*2-gap)/2,fullW=W-pad*2,rowH=28,boxTop=88;
@@ -893,7 +987,9 @@ function saveReportImage(){
     layouts.push({x:pad,y:boxTop,w:colW,h:hTop},{x:pad+colW+gap,y:boxTop,w:colW,h:hTop},{x:pad,y:boxTop+hTop+gap,w:fullW,h:hBot});
     totalCardsH=hTop+gap+hBot;
   }
-  const H=boxTop+totalCardsH+14+46+pad;
+  const hasAnyMarks=cfg.parts.some((_,i)=>markStats(i).has);
+  const footH=hasAnyMarks?66:46;
+  const H=boxTop+totalCardsH+14+footH+pad;
   const dpr=2,c=document.createElement('canvas');c.width=W*dpr;c.height=H*dpr;
   const ctx=c.getContext('2d');ctx.scale(dpr,dpr);
   ctx.fillStyle='#f4f5f7';ctx.fillRect(0,0,W,H);
@@ -902,10 +998,10 @@ function saveReportImage(){
   ctx.fillText('Mock Exam — Report Card',pad,42);
   ctx.fillStyle='#6b7280';ctx.font='15px system-ui,sans-serif';
   ctx.fillText((cfg.examName?'Exam Name: '+cfg.examName+'  ·  ':'')+cfg.name+'  ·  '+repTime,pad,66);
-  let totAns=0,totQ=0,totTime=0;
+  let totAns=0,totQ=0,totTime=0,totOk=0,totBad=0;
   cfg.parts.forEach((P,i)=>{
     const {x,y,w,h}=layouts[i],A=ans[i],n=A.filter(Boolean).length,{M,ok,bad,has}=markStats(i);
-    totAns+=n;totQ+=P.q;totTime+=used[i];
+    totAns+=n;totQ+=P.q;totTime+=used[i];totOk+=ok;totBad+=bad;
     ctx.fillStyle='#ffffff';ctx.strokeStyle='#e2e4e9';ctx.lineWidth=1.5;
     rrect(x,y,w,h,14);ctx.fill();ctx.stroke();
     ctx.fillStyle='#18181b';ctx.font='bold 18px system-ui,sans-serif';
@@ -914,14 +1010,25 @@ function saveReportImage(){
     ctx.fillText(`Time: ${fmt(used[i])} / ${fmt(P.m*60)}`,x+16,y+50);
     ctx.textAlign='right';ctx.fillText(`Answered: ${n} / ${P.q}`,x+w-16,y+50);ctx.textAlign='left';
     if(has){
+      const pct=Math.round(ok*100/P.q);
       ctx.font='bold 13px system-ui,sans-serif';
-      ctx.fillStyle='#16a34a';ctx.fillText(`Right: ${ok}`,x+16,y+70);
-      ctx.fillStyle='#dc2626';ctx.fillText(`Wrong: ${bad}`,x+92,y+70);
+      ctx.fillStyle='#16a34a';ctx.fillText(`Right: ${ok} (${pct}%)`,x+16,y+70);
+      ctx.fillStyle='#dc2626';ctx.fillText(`Wrong: ${bad}`,x+130,y+70);
     }
     const lineY=y+(has?80:62);
     ctx.strokeStyle='#e5e7eb';ctx.beginPath();ctx.moveTo(x+14,lineY);ctx.lineTo(x+w-14,lineY);ctx.stroke();
     const cellW=(w-32-10)/2;
     let cy=lineY+10;
+    const drawCell=(cx,ry,num,val,mk)=>{
+      ctx.fillStyle=mk==='ok'?'#dcfce7':mk==='bad'?'#fee2e2':'#f4f5f7';
+      rrect(cx,ry,cellW,rowH-4,6);ctx.fill();
+      ctx.fillStyle='#18181b';ctx.font='13px system-ui,sans-serif';
+      ctx.fillText(num+')',cx+8,ry+17);
+      const a=(val?lbl(val):'—')+(mk==='ok'?' ✓':mk==='bad'?' ✕':'');
+      ctx.fillStyle=mk==='ok'?'#16a34a':mk==='bad'?'#dc2626':val?'#2563eb':'#9ca3af';
+      ctx.font='bold 14px system-ui,sans-serif';
+      ctx.textAlign='right';ctx.fillText(a,cx+cellW-10,ry+17);ctx.textAlign='left';
+    };
     if(P.listen){
       let q=0;
       for(const md of LISTEN_MONDAI){
@@ -929,49 +1036,263 @@ function saveReportImage(){
         ctx.fillText('Mondai '+md.m,x+16,cy+15);
         cy+=26;
         for(let j=1;j<=md.q;j++){
-          const idx=++q,r=Math.floor((j-1)/2),col=(j-1)%2,val=A[idx],mk=M[idx];
-          const cx=x+16+col*(cellW+10),ry=cy+r*rowH;
-          ctx.fillStyle=mk==='ok'?'#dcfce7':mk==='bad'?'#fee2e2':'#f4f5f7';
-          rrect(cx,ry,cellW,rowH-4,6);ctx.fill();
-          ctx.fillStyle='#18181b';ctx.font='13px system-ui,sans-serif';
-          ctx.fillText(j+')',cx+8,ry+17);
-          const a=(val?lbl(val):'—')+(mk==='ok'?' ✓':mk==='bad'?' ✕':'');
-          ctx.fillStyle=mk==='ok'?'#16a34a':mk==='bad'?'#dc2626':val?'#2563eb':'#9ca3af';
-          ctx.font='bold 14px system-ui,sans-serif';
-          ctx.textAlign='right';ctx.fillText(a,cx+cellW-10,ry+17);ctx.textAlign='left';
+          const idx=++q,r=Math.floor((j-1)/2),col=(j-1)%2;
+          drawCell(x+16+col*(cellW+10),cy+r*rowH,j,A[idx],M[idx]);
         }
         cy+=Math.ceil(md.q/2)*rowH;
       }
     }else{
       for(let q=1;q<=P.q;q++){
-        const r=Math.floor((q-1)/2),col=(q-1)%2,val=A[q];
-        const cx=x+16+col*(cellW+10),ry=cy+r*rowH;
-        ctx.fillStyle='#f4f5f7';rrect(cx,ry,cellW,rowH-4,6);ctx.fill();
-        ctx.fillStyle='#18181b';ctx.font='13px system-ui,sans-serif';
-        ctx.fillText(q+')',cx+8,ry+17);
-        const a=val?lbl(val):'—';
-        ctx.fillStyle=val?'#2563eb':'#9ca3af';ctx.font='bold 14px system-ui,sans-serif';
-        ctx.textAlign='right';ctx.fillText(a,cx+cellW-10,ry+17);ctx.textAlign='left';
+        const r=Math.floor((q-1)/2),col=(q-1)%2;
+        drawCell(x+16+col*(cellW+10),cy+r*rowH,q,A[q],M[q]);
       }
     }
   });
   const fy=boxTop+totalCardsH+14;
   ctx.fillStyle='#ffffff';ctx.strokeStyle='#e2e4e9';ctx.lineWidth=1.5;
-  rrect(pad,fy,W-pad*2,46,14);ctx.fill();ctx.stroke();
+  rrect(pad,fy,W-pad*2,footH,14);ctx.fill();ctx.stroke();
   ctx.fillStyle='#18181b';ctx.font='bold 15px system-ui,sans-serif';
   ctx.fillText(`Total Answered: ${totAns} / ${totQ}`,pad+16,fy+28);
   ctx.textAlign='right';ctx.fillText(`Total Time: ${fmt(totTime)}`,W-pad-16,fy+28);ctx.textAlign='left';
-  c.toBlob(blob=>{
+  if(hasAnyMarks){
+    const pct=Math.round(totOk*100/totQ);
+    ctx.fillStyle='#16a34a';ctx.font='bold 14px system-ui,sans-serif';
+    ctx.fillText(`Total Score: ✓ ${totOk} / ${totQ} (${pct}%)`,pad+16,fy+52);
+    ctx.fillStyle='#dc2626';ctx.textAlign='right';
+    ctx.fillText(`Wrong: ${totBad}`,W-pad-16,fy+52);ctx.textAlign='left';
+  }
+  c.toBlob(async blob=>{
+    let outBlob=blob;
+    try{
+      const buf=await blob.arrayBuffer();
+      outBlob=new Blob([embedPngText(buf,'MockExamData',encodeExamState())],{type:'image/png'});
+    }catch(e){}
     const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
+    a.href=URL.createObjectURL(outBlob);
     a.download=`report_${(cfg.name||'exam').replace(/[^a-z0-9_-]/gi,'_')}.png`;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),5000);
   },'image/png');
 }
+
+/* Profile, History, Custom Link & PNG Metadata */
+const PROFILE_KEY='mock_exam_profile_v1';
+function loadProfile(){
+  try{return JSON.parse(localStorage.getItem(PROFILE_KEY)||'{}')}catch(e){return{}}
+}
+function saveProfile(p){
+  try{localStorage.setItem(PROFILE_KEY,JSON.stringify(p))}catch(e){}
+}
+function saveProfileName(n){
+  const p=loadProfile();p.name=n;if(!Array.isArray(p.exams))p.exams=[];saveProfile(p);
+}
+function packArr(arr,q,empty){
+  let s='';
+  for(let i=1;i<=q;i++){
+    const v=arr[i];
+    if(empty==='0')s+=v?String(v):'0';
+    else s+=v==='ok'?'o':v==='bad'?'x':'.';
+  }
+  return s;
+}
+function unpackAns(s,q){
+  const a=[];
+  for(let i=1;i<=q;i++){const c=s[i-1];if(c>='1'&&c<='4')a[i]=+c}
+  return a;
+}
+function unpackMarks(s,q){
+  const m=[];
+  for(let i=1;i<=q;i++){const c=s[i-1];if(c==='o')m[i]='ok';else if(c==='x')m[i]='bad'}
+  return m;
+}
+function buildExamRecord(){
+  return{
+    v:1,
+    id:currentExamId||('ex_'+Date.now().toString(36)),
+    n:cfg.name,
+    en:cfg.examName||'',
+    dt:repTime||new Date().toLocaleString(),
+    st:cfg.style||'num',
+    p:cfg.parts.map((P,i)=>({
+      l:P.label,ls:P.listen?1:0,q:P.q,m:P.m,
+      u:Math.round(used[i]||0),
+      a:packArr(ans[i]||[],P.q,'0'),
+      k:packArr(marks[i]||[],P.q,'.')
+    }))
+  };
+}
+function applyExamRecord(rec){
+  currentExamId=rec.id||('ex_'+Date.now().toString(36));
+  repTime=rec.dt||new Date().toLocaleString();
+  cfg={name:rec.n||'Student',driveId:'',examName:rec.en||'',ytId:'',style:rec.st||'num',
+    parts:rec.p.map(x=>({label:x.l,listen:!!x.ls,pages:[],q:x.q,m:x.m}))};
+  ans=rec.p.map(x=>unpackAns(x.a||'',x.q));
+  marks=rec.p.map(x=>unpackMarks(x.k||'',x.q));
+  used=rec.p.map(x=>x.u||0);
+}
+function saveCurrentExamToHistory(){
+  if(!cfg||!cfg.parts)return;
+  const p=loadProfile();
+  if(!Array.isArray(p.exams))p.exams=[];
+  if(cfg.name)p.name=cfg.name;
+  const rec=buildExamRecord();
+  const idx=p.exams.findIndex(x=>x.id===rec.id);
+  if(idx>=0)p.exams[idx]=rec;
+  else p.exams.unshift(rec);
+  if(p.exams.length>40)p.exams=p.exams.slice(0,40);
+  saveProfile(p);
+  renderHistory();
+}
+function b64uEncode(str){
+  const bytes=new TextEncoder().encode(str);
+  let bin='';for(const b of bytes)bin+=String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64uDecode(str){
+  let s=str.replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length%4)s+='=';
+  const bin=atob(s),bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function encodeExamState(){return b64uEncode(JSON.stringify(buildExamRecord()))}
+function decodeExamState(tok){
+  const rec=JSON.parse(b64uDecode(tok));
+  if(!rec||!Array.isArray(rec.p))throw new Error('Invalid data');
+  return rec;
+}
+function crc32(bytes){
+  let c=0xffffffff;
+  for(let i=0;i<bytes.length;i++){
+    c^=bytes[i];
+    for(let k=0;k<8;k++)c=(c>>>1)^(c&1?0xedb88320:0);
+  }
+  return(c^0xffffffff)>>>0;
+}
+function embedPngText(buf,key,val){
+  const src=new Uint8Array(buf);
+  const kb=new TextEncoder().encode(key),vb=new TextEncoder().encode(val);
+  const dataLen=kb.length+1+vb.length;
+  const chunk=new Uint8Array(12+dataLen);
+  const dv=new DataView(chunk.buffer);
+  dv.setUint32(0,dataLen);
+  chunk.set([116,69,88,116],4);
+  chunk.set(kb,8);chunk[8+kb.length]=0;chunk.set(vb,9+kb.length);
+  dv.setUint32(8+dataLen,crc32(chunk.subarray(4,8+dataLen)));
+  let pos=8;
+  while(pos+12<=src.length){
+    const len=new DataView(src.buffer,src.byteOffset+pos,4).getUint32(0);
+    const type=String.fromCharCode(src[pos+4],src[pos+5],src[pos+6],src[pos+7]);
+    if(type==='IEND'){
+      const out=new Uint8Array(src.length+chunk.length);
+      out.set(src.subarray(0,pos),0);
+      out.set(chunk,pos);
+      out.set(src.subarray(pos),pos+chunk.length);
+      return out;
+    }
+    pos+=12+len;
+  }
+  return src;
+}
+function extractPngText(buf,key){
+  const src=new Uint8Array(buf);
+  if(src.length<8||src[0]!==137||src[1]!==80)return null;
+  let pos=8;
+  while(pos+12<=src.length){
+    const len=new DataView(src.buffer,src.byteOffset+pos,4).getUint32(0);
+    const type=String.fromCharCode(src[pos+4],src[pos+5],src[pos+6],src[pos+7]);
+    if(type==='tEXt'){
+      const d=src.subarray(pos+8,pos+8+len);
+      const nul=d.indexOf(0);
+      if(nul>0){
+        const k=new TextDecoder().decode(d.subarray(0,nul));
+        if(k===key)return new TextDecoder().decode(d.subarray(nul+1));
+      }
+    }
+    if(type==='IEND')break;
+    pos+=12+len;
+  }
+  return null;
+}
+function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function renderHistory(){
+  const p=loadProfile(),exams=Array.isArray(p.exams)?p.exams:[];
+  $('profileStats').textContent=`Saved Name: ${p.name||'—'} · Total Exams: ${exams.length}`;
+  const list=$('historyList');
+  if(!exams.length){list.innerHTML='<div class="mu" style="margin-top:6px">এখনো কোনো exam save হয়নি। Exam দিলে এখানে auto-save থাকবে।</div>';return}
+  list.innerHTML=exams.map((ex,idx)=>{
+    let totQ=0,ok=0,bad=0;
+    ex.p.forEach(x=>{totQ+=x.q;for(const c of (x.k||'')){if(c==='o')ok++;else if(c==='x')bad++}});
+    const graded=(ok+bad)>0,pct=totQ?Math.round(ok*100/totQ):0;
+    const title=ex.en||ex.p.map(x=>x.l).join(' + ');
+    const badge=graded?`<span class="badge ok">✓ ${ok}/${totQ} (${pct}%)</span>`:`<span class="badge pend">Pending Check</span>`;
+    return `<div class="hist-item">
+      <div class="hist-info">
+        <div class="hist-title">${esc(title)}</div>
+        <div class="hist-meta">${esc(ex.n||'Student')} · ${esc(ex.dt)} · ${badge}</div>
+      </div>
+      <div class="hist-acts">
+        <button type="button" class="btn sec hist-open" data-i="${idx}" style="padding:7px 10px;font-size:12px">${graded?'Report':'Check'}</button>
+        <button type="button" class="btn sec hist-del" data-i="${idx}" style="padding:7px 9px;font-size:12px;color:var(--bad)" title="Delete">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.hist-open').forEach(b=>b.onclick=()=>{
+    const ex=loadProfile().exams[+b.dataset.i];if(!ex)return;
+    applyExamRecord(ex);
+    const hasMarks=cfg.parts.some((_,i)=>markStats(i).has);
+    if(hasMarks)showReport(true);else openReview(-1);
+  });
+  list.querySelectorAll('.hist-del').forEach(b=>b.onclick=()=>{
+    const pr=loadProfile();pr.exams.splice(+b.dataset.i,1);saveProfile(pr);renderHistory();
+  });
+}
+function goHome(){
+  stopYt();clearInterval(tick);
+  $('exam').classList.add('hide');$('listenReview').classList.add('hide');$('report').classList.add('hide');
+  $('setup').classList.remove('hide');
+  if(location.hash.startsWith('#r='))history.replaceState(null,'',location.pathname+location.search);
+  renderHistory();
+  window.scrollTo(0,0);
+}
+$('checkAnsBtn').onclick=()=>openReview(-1);
+$('copyLinkBtn').onclick=async()=>{
+  const url=location.origin+location.pathname+'#r='+encodeExamState();
+  try{await navigator.clipboard.writeText(url);$('copyLinkBtn').textContent='Link Copied ✓';setTimeout(()=>$('copyLinkBtn').textContent='Copy Review Link',2500)}
+  catch(e){prompt('Copy Review Link:',url)}
+};
+$('newExamBtn').onclick=()=>goHome();
 $('imgBtn').onclick=saveReportImage;
 $('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(reportText);$('copyBtn').textContent='Copied ✓'}catch(e){prompt('Copy:',reportText)}};
 $('printBtn').onclick=()=>window.print();
+$('importPngBtn').onclick=()=>$('importPngInput').click();
+$('importPngInput').onchange=async()=>{
+  const f=$('importPngInput').files[0];$('importPngInput').value='';
+  if(!f)return;
+  try{
+    const buf=await f.arrayBuffer();
+    const raw=extractPngText(buf,'MockExamData');
+    if(!raw){toast('এই PNG-তে Report Data পাওয়া যায়নি (WhatsApp/Messenger-এ পাঠালে data মুছে যায়)। Custom Review Link অথবা Recent Exams ব্যবহার করো।');return}
+    applyExamRecord(decodeExamState(raw));
+    saveCurrentExamToHistory();
+    openReview(-1);
+  }catch(e){toast('PNG load করা যায়নি: '+e.message)}
+};
+function checkHashReview(){
+  if(!location.hash.startsWith('#r='))return;
+  try{
+    applyExamRecord(decodeExamState(location.hash.slice(3)));
+    saveCurrentExamToHistory();
+    openReview(-1);
+  }catch(e){toast('Review link-টি সঠিক নয় বা ভেঙে গেছে।')}
+}
+(()=>{
+  const p=loadProfile();
+  if(p.name&&!$('name').value)$('name').value=p.name;
+  renderHistory();
+  checkHashReview();
+  window.addEventListener('hashchange',checkHashReview);
+})();
 </script>
 </body>
 </html>
