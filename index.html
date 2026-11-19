@@ -1050,17 +1050,30 @@ function openReview(pIdx){
   $('lrBody').querySelectorAll('.key-btn').forEach(btn=>{
     btn.onclick=()=>{
       const pi=+btn.dataset.p,start=+(btn.dataset.start||1),len=+(btn.dataset.len||cfg.parts[pi].q),P=cfg.parts[pi];
-      const raw=$('lrBody').querySelector(`.key-in[data-p="${pi}"][data-start="${start}"]`).value;
+      const inp=btn.previousElementSibling;
+      const raw=inp?inp.value:'';
       const keys=parseKeyTokens(raw);
       if(!keys.length){toast('সঠিক Answer Key দাও (1-4 অথবা A-D)।');return}
-      const n=Math.min(len,keys.length,P.q-start+1);
-      for(let k=0;k<n;k++){
-        const q=start+k;
-        marks[pi][q]=ans[pi][q]===keys[k]?'ok':'bad';
+      let checked=0;
+      if(P.listen&&start===1&&len===P.q){
+        const slots=[];
+        for(const md of effectiveMondai(P,ans[pi]||[],marks[pi]||[])){
+          for(let j=1;j<=md.effQ;j++)slots.push(md.off+j);
+        }
+        const n=Math.min(slots.length,keys.length);
+        for(let k=0;k<n;k++){const q=slots[k];marks[pi][q]=ans[pi][q]===keys[k]?'ok':'bad'}
+        checked=n;
+      }else{
+        const n=Math.min(len,keys.length,P.q-start+1);
+        for(let k=0;k<n;k++){
+          const q=start+k;
+          marks[pi][q]=ans[pi][q]===keys[k]?'ok':'bad';
+        }
+        checked=n;
       }
       saveCurrentExamToHistory();
       openReview(lrPartIdx);
-      toast(`${n}টি প্রশ্ন Auto-Check হয়েছে!`);
+      toast(`${checked}টি প্রশ্ন Auto-Check হয়েছে!`);
     };
   });
   updLrProg();
