@@ -664,7 +664,7 @@ async function startPart(i,auto,resumeSec){
   $('partLabel').textContent=P.label;
   $('nextBtn').textContent=i<cfg.parts.length-1?cfg.parts[i+1].label+' ▸':'Submit ✓';
   $('listenModeBar').classList.toggle('hide',!P.listen);
-  const usePad=P.listen&&!cfg.driveId&&!P.pages.length;
+  const usePad=P.listen&&!P.pages.length&&(!cfg.driveId||!!cfg.ytId);
   const hasYt=!!(P.listen&&cfg.ytId);
   $('ytSpdBar').classList.toggle('hide',!hasYt);
   $('ytSpdBar').querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.r==='1'));
