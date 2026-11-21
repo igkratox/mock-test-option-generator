@@ -27,9 +27,19 @@ button:active{transform:scale(.97)}
 .hide{display:none!important}
 /* exam */
 #exam{position:fixed;inset:0;z-index:1;background:var(--bg);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
-.top{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--bd);position:relative}
-.top .t{font-variant-numeric:tabular-nums;font-size:21px;font-weight:800;margin-left:auto;padding:2px 8px;border-radius:8px;background:var(--bg)}
+.top{display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--card);border-bottom:1px solid var(--bd);position:relative}
+.top>*{flex:none}
+.top #partLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto;font-size:15px}
+.top .t{font-variant-numeric:tabular-nums;font-size:18px;font-weight:800;margin-left:auto;padding:2px 7px;border-radius:8px;background:var(--bg);white-space:nowrap}
 .top .t.low{color:var(--bad);background:rgba(220,38,38,.1)}
+@media(max-width:480px){
+  .top{gap:4px;padding:6px 8px}
+  .top #partLabel{font-size:13px}
+  .top #progress{font-size:11px}
+  .top .t{font-size:16px;padding:2px 6px}
+  .top #examHomeBtn,.top #nextBtn{padding:5px 8px!important;font-size:12px!important;white-space:nowrap}
+  .top .icon-btn{padding:4px 6px;font-size:12px}
+}
 .pbar{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--bd)}
 .pbar>i{display:block;height:100%;width:0;background:var(--ac);transition:width .2s}
 .main{flex:1;min-height:0;display:flex;position:relative}
@@ -164,7 +174,6 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 .yt-spd button{padding:3px 7px;font-size:11px;border-radius:6px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-weight:700}
 .yt-spd button.sel{background:var(--ac);border-color:var(--ac);color:var(--acx)}
 .chip.add-q{background:var(--ac-soft);color:var(--ac);border:1px dashed var(--ac);font-weight:800;min-width:32px}
-#exam{position:relative}
 #exam.is-paused .main,#exam.is-paused .dock,#exam.is-paused .lmode-bar,#exam.is-paused .yt-top{filter:blur(12px);pointer-events:none;user-select:none}
 #exam.is-paused #nextBtn{pointer-events:none;opacity:.5}
 .pause-ov{position:absolute;inset:52px 0 0 0;z-index:30;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.35);backdrop-filter:blur(4px)}
