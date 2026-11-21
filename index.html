@@ -537,7 +537,7 @@ function stopYt(){
   const top=$('ytTopWrap');if(top){top.innerHTML='';top.classList.add('hide')}
 }
 async function mountYt(el,videoId){
-  stopYt();
+  if(ytPlayer){try{ytPlayer.destroy()}catch(e){}ytPlayer=null}
   el.innerHTML='<div id="ytFrameTarget"></div>';
   try{
     await loadYtApi();
@@ -1132,7 +1132,7 @@ $('yesListenBtn').onclick=()=>{
   const lp=(pdf&&!cfg.driveId&&$('p3pages').value.trim())?parsePages($('p3pages').value,pdf.numPages):[];
   cfg.parts.push({label:'Listening',listen:true,mondai:cloneMondai(),pages:lp,q:LISTEN_TOTAL,m:Math.max(1,+$('p3m').value||30)});
   ans.push([]);marks.push([]);flags.push([]);used.push(0);
-  startPart(2,pendingAuto);
+  startPart(cfg.parts.length-1,pendingAuto);
 };
 $('noListenBtn').onclick=()=>{
   $('askListenModal').classList.add('hide');
