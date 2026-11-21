@@ -365,25 +365,31 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   </div>
 </div>
 
-<div id="askListenModal" class="modal-bg hide">
-  <div class="modal">
-    <h3>Listening (聴解) আছে?</h3>
-    <div class="mu">Part 1 ও Part 2 শেষ হয়েছে। এখন Listening শুরু করবে নাকি Report Card দেখবে?</div>
-    <div style="margin-top:12px">
-      <div class="mu">Listening Time (min)</div>
-      <div class="step"><button data-t="p3m" data-d="-5">−</button><input id="p3m" type="number" min="1" value="30"><button data-t="p3m" data-d="5">+</button></div>
+<div id="askListenPage" class="hide">
+  <div class="top" style="position:sticky;top:0;z-index:10">
+    <strong>Listening (聴解)</strong>
+    <button class="btn sec" id="askListenHomeBtn" style="margin-left:auto;padding:8px 12px">Home</button>
+  </div>
+  <div class="wrap">
+    <div class="card">
+      <h3>Listening (聴解) আছে?</h3>
+      <div class="mu" id="askListenDesc">Part 1 ও Part 2 শেষ হয়েছে। এখন Listening শুরু করবে নাকি Report Card দেখবে?</div>
+      <div style="margin-top:12px">
+        <div class="mu">Listening Time (min)</div>
+        <div class="step"><button data-t="p3m" data-d="-5">−</button><input id="p3m" type="number" min="1" value="30"><button data-t="p3m" data-d="5">+</button></div>
+      </div>
+      <div id="p3pagesWrap" style="margin-top:8px" class="hide">
+        <div class="mu">Listening PDF pages (optional)</div>
+        <input id="p3pages" placeholder="খালি রাখলে Listening Pad দেখাবে">
+      </div>
+      <div style="margin-top:8px">
+        <div class="mu">YouTube Link (optional)</div>
+        <input id="p3yt" type="url" placeholder="https://youtu.be/... (খালি রাখলে শুধু Pad)">
+        <div id="p3ytErr" class="mu" style="color:var(--bad);margin-top:4px"></div>
+      </div>
+      <button class="btn" id="yesListenBtn" style="margin-top:14px">হ্যাঁ, Listening শুরু করো</button>
+      <button class="btn sec" id="noListenBtn" style="width:100%;margin-top:8px">না, Report Card দেখাও</button>
     </div>
-    <div id="p3pagesWrap" style="margin-top:8px" class="hide">
-      <div class="mu">Listening PDF pages (optional)</div>
-      <input id="p3pages" placeholder="খালি রাখলে Listening Pad দেখাবে">
-    </div>
-    <div style="margin-top:8px">
-      <div class="mu">YouTube Link (optional)</div>
-      <input id="p3yt" type="url" placeholder="https://youtu.be/... (খালি রাখলে শুধু Pad)">
-      <div id="p3ytErr" class="mu" style="color:var(--bad);margin-top:4px"></div>
-    </div>
-    <button class="btn" id="yesListenBtn" style="margin-top:14px">হ্যাঁ, Listening শুরু করো</button>
-    <button class="btn sec" id="noListenBtn" style="width:100%;margin-top:8px">না, Report Card দেখাও</button>
   </div>
 </div>
 
@@ -596,7 +602,7 @@ function beginExam(name,driveId,parts,examName,ytId){
   flags=parts.map(()=>[]);
   used=parts.map(()=>0);
   $('driveWrap').innerHTML='';$('driveWrap').classList.add('hide');$('pages').classList.remove('hide');
-  $('setup').classList.add('hide');$('report').classList.add('hide');$('listenReview').classList.add('hide');$('exam').classList.remove('hide');window.scrollTo(0,0);
+  showView('exam');window.scrollTo(0,0);
   startPart(0);
 }
 
@@ -947,6 +953,21 @@ function onTick(){
   if(Date.now()-lastAutoSaveTs>5000){lastAutoSaveTs=Date.now();saveActiveExam()}
   if(rem<=0)finishPart(true);
 }
+function showView(id){
+  ['setup','exam','askListenPage','listenReview','report'].forEach(v=>$(v).classList.toggle('hide',v!==id));
+}
+function openAskListen(){
+  stopYt();
+  $('askListenDesc').textContent=cfg.parts.length===1
+    ?'Exam শেষ হয়েছে। এখন Listening শুরু করবে নাকি Report Card দেখবে?'
+    :'Part 1 ও Part 2 শেষ হয়েছে। এখন Listening শুরু করবে নাকি Report Card দেখবে?';
+  $('p3ytErr').textContent='';
+  $('p3yt').value='';
+  $('p3pages').value='';
+  $('p3pagesWrap').classList.toggle('hide',!(pdf&&!cfg.driveId));
+  showView('askListenPage');
+  window.scrollTo(0,0);
+}
 let pendingAuto=false;
 function finishPart(auto){
   clearInterval(tick);
@@ -955,10 +976,9 @@ function finishPart(auto){
   $('exam').classList.remove('is-paused');$('pauseOverlay').classList.add('hide');
   used[part]=auto?limit:Math.min(limit,limit-remNow);
   if(part<cfg.parts.length-1)startPart(part+1,auto);
-  else if(part===1&&cfg.parts.length===2){
+  else if(!cfg.parts[part].listen){
     pendingAuto=!!auto;
-    $('p3pagesWrap').classList.toggle('hide',!(pdf&&!cfg.driveId));
-    $('askListenModal').classList.remove('hide');
+    openAskListen();
   }else if(cfg.parts[part].listen){
     clearActiveExam();
     const M=marks[part]||[],eff=effectiveCount(ans[part],M,cfg.parts[part].q);
@@ -1014,8 +1034,7 @@ function parseKeyTokens(raw){
 function openReview(pIdx){
   stopYt();
   lrPartIdx=pIdx;
-  $('setup').classList.add('hide');$('exam').classList.add('hide');$('report').classList.add('hide');
-  $('listenReview').classList.remove('hide');
+  showView('listenReview');
   $('lrTitle').textContent=pIdx>=0?cfg.parts[pIdx].label+' Review':'Answer Check / Grading';
   let html='';
   for(const pi of reviewPartIndices()){
@@ -1132,19 +1151,20 @@ $('lrShowReportBtn').onclick=()=>{
 };
 $('forceReportBtn').onclick=()=>{$('missingListenModal').classList.add('hide');showReport()};
 $('backToReviewBtn').onclick=()=>$('missingListenModal').classList.add('hide');
+$('askListenHomeBtn').onclick=()=>{if(confirm('Home-এ ফিরে যাবে? চলমান exam মুছে যাবে।'))goHome()};
 $('yesListenBtn').onclick=()=>{
   $('p3ytErr').textContent='';
   const ytRaw=$('p3yt').value.trim(),ytId=ytIdOf(ytRaw);
   if(ytRaw&&!ytId){$('p3ytErr').textContent='সঠিক YouTube link দাও (অথবা খালি রাখো)।';return}
-  $('askListenModal').classList.add('hide');
   cfg.ytId=ytId;
   const lp=(pdf&&!cfg.driveId&&$('p3pages').value.trim())?parsePages($('p3pages').value,pdf.numPages):[];
   cfg.parts.push({label:'Listening',listen:true,mondai:cloneMondai(),pages:lp,q:LISTEN_TOTAL,m:Math.max(1,+$('p3m').value||30)});
   ans.push([]);marks.push([]);flags.push([]);used.push(0);
+  showView('exam');
+  window.scrollTo(0,0);
   startPart(cfg.parts.length-1,pendingAuto);
 };
 $('noListenBtn').onclick=()=>{
-  $('askListenModal').classList.add('hide');
   clearActiveExam();
   showReport();
 };
@@ -1164,7 +1184,7 @@ function markStats(i){
 }
 function showReport(keepTime){
   stopYt();
-  $('setup').classList.add('hide');$('exam').classList.add('hide');$('listenReview').classList.add('hide');$('report').classList.remove('hide');
+  showView('report');
   if(!keepTime||!repTime)repTime=new Date().toLocaleString();
   saveCurrentExamToHistory();
   $('repName').textContent=(cfg.examName?'Exam Name: '+cfg.examName+' · ':'')+cfg.name+' · '+repTime;
@@ -1627,7 +1647,7 @@ function checkActiveExam(){
         toast('Refresh-এর কারণে local PDF পাওয়া যায়নি; Answer Sheet চালু হয়েছে।');
       }
       $('driveWrap').innerHTML='';$('driveWrap').classList.add('hide');$('pages').classList.remove('hide');
-      $('setup').classList.add('hide');$('report').classList.add('hide');$('listenReview').classList.add('hide');$('exam').classList.remove('hide');window.scrollTo(0,0);
+      showView('exam');window.scrollTo(0,0);
       startPart(s.part||0,false,s.rem);
     };
     $('discardExamBtn').onclick=()=>clearActiveExam();
@@ -1635,8 +1655,7 @@ function checkActiveExam(){
 }
 function goHome(){
   stopYt();clearInterval(tick);clearActiveExam();
-  $('exam').classList.add('hide');$('listenReview').classList.add('hide');$('report').classList.add('hide');
-  $('setup').classList.remove('hide');
+  showView('setup');
   if(location.hash.startsWith('#r='))history.replaceState(null,'',location.pathname+location.search);
   renderHistory();
   window.scrollTo(0,0);
