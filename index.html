@@ -178,6 +178,12 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 #exam.is-paused #nextBtn{pointer-events:none;opacity:.5}
 .pause-ov{position:absolute;inset:52px 0 0 0;z-index:30;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.35);backdrop-filter:blur(4px)}
 .pause-box{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:24px;max-width:340px;width:100%;text-align:center;box-shadow:0 16px 40px rgba(0,0,0,.35)}
+.cert-card{border:2px solid var(--bd);border-radius:16px;padding:20px 16px;text-align:center;background:var(--card);margin-top:14px;box-shadow:var(--sh)}
+.cert-circle{width:152px;height:152px;border-radius:50%;margin:14px auto;display:flex;flex-direction:column;align-items:center;justify-content:center;border:7px solid var(--ac);background:var(--bg);box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.cert-circle.fail-c{border-color:var(--bad)}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.pill.live{background:rgba(22,163,74,.15);color:var(--ok)}
+.pill.end{background:rgba(220,38,38,.14);color:var(--bad)}
 </style>
 </head>
 <body>
@@ -359,6 +365,9 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     <button class="btn" id="checkAnsBtn" style="margin-top:0;flex:1 1 180px">Check / Grade Answers</button>
     <button class="btn sec" id="copyLinkBtn" style="flex:1 1 150px">Copy Review Link</button>
     <button class="btn sec" id="imgBtn" style="flex:1 1 150px">Save Image (PNG)</button>
+    <button class="btn sec hide" id="dlCertBtn" style="flex:1 1 150px">Download Certificate PNG</button>
+    <button class="btn sec hide" id="dlSheetBtn" style="flex:1 1 150px">Download Answer Sheet PNG</button>
+    <button class="btn hide" id="dlBothBtn" style="margin-top:0;flex:1 1 170px">Download Both (PNG)</button>
     <button class="btn sec" id="copyBtn">Copy text</button>
     <button class="btn sec" id="printBtn">Print / Save PDF</button>
     <button class="btn sec" id="newExamBtn">New exam</button>
@@ -1037,6 +1046,24 @@ function openReview(pIdx){
   showView('listenReview');
   $('lrTitle').textContent=pIdx>=0?cfg.parts[pIdx].label+' Review':'Answer Check / Grading';
   let html='';
+  if(cfg&&Array.isArray(cfg.parts)&&cfg.parts.length){
+    html+=`<div class="card" id="soloMarksCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <h3 style="margin:0">Marks Setup (প্রতি Part-এর Total Marks)</h3>
+        <span class="mu" id="soloMarksSumHint" style="font-size:12px"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+        ${cfg.parts.map((P,pi)=>{
+          const qCnt=soloPartQCount(pi),curT=soloPartDefaultTotal(pi);
+          return `<div style="padding:8px 10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg)">
+            <div style="font-weight:700;font-size:13px">${esc(P.label)} <span class="mu" style="font-weight:500">(${qCnt} Qs)</span></div>
+            <input type="number" class="solo-pt-in" data-p="${pi}" min="1" step="1" value="${curT}" style="margin-top:6px;padding:7px 9px;font-size:14px;font-weight:700">
+            <div class="mu solo-pq-hint" data-p="${pi}" style="font-size:11px;margin-top:4px">Per Q ≈ ${(curT/qCnt).toFixed(2)}m</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
   for(const pi of reviewPartIndices()){
     const P=cfg.parts[pi],A=ans[pi]||[],M=marks[pi]||[];
     const {ok,bad,has}=markStats(pi);
@@ -1087,6 +1114,24 @@ function openReview(pIdx){
     html+=`</div>`;
   }
   $('lrBody').innerHTML=html;
+  const updSoloMarksHint=()=>{
+    const hint=$('soloMarksSumHint');if(!hint)return;
+    const sm=calcSoloSummary();
+    hint.innerHTML=`Total: <b>${sm.maxTot}</b> · Pass: <b>${sm.passTot}</b>`;
+  };
+  updSoloMarksHint();
+  $('lrBody').querySelectorAll('.solo-pt-in').forEach(inp=>{
+    inp.oninput=()=>{
+      const pi=+inp.dataset.p,P=cfg.parts[pi];if(!P)return;
+      const v=Math.max(1,+inp.value||0);
+      if(+inp.value>0)P.tot=v;
+      const qCnt=soloPartQCount(pi);
+      const pq=$('lrBody').querySelector(`.solo-pq-hint[data-p="${pi}"]`);
+      if(pq)pq.textContent=`Per Q ≈ ${(soloPartDefaultTotal(pi)/qCnt).toFixed(2)}m`;
+      updSoloMarksHint();
+      saveCurrentExamToHistory();
+    };
+  });
   $('lrBody').querySelectorAll('.lr-rw button').forEach(b=>{
     b.onclick=()=>{
       const pi=+b.dataset.p,idx=+b.dataset.q,v=b.dataset.v;
@@ -1176,11 +1221,114 @@ $('nextBtn').onclick=()=>{
 };
 function toast(m){const d=document.createElement('div');d.className='toast';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),5000)}
 
-let reportText='',repTime='';
+let reportText='',repTime='',lastSoloCertMeta=null;
 function markStats(i){
   const M=marks[i]||[];
   const ok=M.filter(x=>x==='ok').length,bad=M.filter(x=>x==='bad').length;
   return{M,ok,bad,has:(ok+bad)>0};
+}
+function soloPartDefaultTotal(pi){
+  const parts=cfg?.parts||[];
+  const P=parts[pi];
+  if(!P)return 60;
+  if(+P.tot>0)return +P.tot;
+  const nonL=parts.filter(p=>!p.listen);
+  if(P.listen)return 60;
+  return nonL.length===1?100:60;
+}
+function soloPartQCount(pi){
+  const P=cfg?.parts?.[pi];
+  if(!P)return 1;
+  if(!P.listen)return Math.max(1,P.q||1);
+  const A=ans[pi]||[],M=marks[pi]||[];
+  const eff=effectiveMondai(P,A,M).reduce((s,m)=>s+m.effQ,0);
+  return Math.max(1,eff||P.q||1);
+}
+function calcSoloSummary(){
+  const parts=cfg.parts||[];
+  const pListenIdx=parts.findIndex(p=>p.listen);
+  const hasL=pListenIdx>=0;
+  const nonL=parts.map((p,i)=>({p,i})).filter(x=>!x.p.listen);
+  const onlyL=hasL&&nonL.length===0;
+  const one=!onlyL&&nonL.length===1;
+  const p1Idx=nonL[0]?nonL[0].i:-1;
+  const p2Idx=nonL[1]?nonL[1].i:-1;
+  const p1Tot=onlyL?0:soloPartDefaultTotal(p1Idx);
+  const p2Tot=(onlyL||one)?0:soloPartDefaultTotal(p2Idx);
+  const lTot=hasL?soloPartDefaultTotal(pListenIdx):0;
+  const maxTot=p1Tot+p2Tot+lTot;
+  const partScore=(pi,partTotal,isListen)=>{
+    if(pi<0||!parts[pi])return{ok:0,q:0,scaled:0};
+    const P=parts[pi],A=ans[pi]||[],M=marks[pi]||[];
+    let ok=0,qCnt=0;
+    if(isListen){
+      for(const md of effectiveMondai(P,A,M)){
+        qCnt+=md.effQ;
+        for(let j=1;j<=md.effQ;j++)if(M[md.off+j]==='ok')ok++;
+      }
+      if(!qCnt)qCnt=P.q;
+    }else{
+      qCnt=P.q;
+      for(let q=1;q<=qCnt;q++)if(M[q]==='ok')ok++;
+    }
+    const raw=ok*(partTotal/Math.max(1,qCnt));
+    const scaled=ok===qCnt?partTotal:Math.min(partTotal,Math.round(raw*10)/10);
+    return{ok,q:qCnt,scaled};
+  };
+  const p1Res=onlyL?{ok:0,q:0,scaled:0}:partScore(p1Idx,p1Tot,false);
+  const p2Res=(onlyL||one)?{ok:0,q:0,scaled:0}:partScore(p2Idx,p2Tot,false);
+  const p3Res=hasL?partScore(pListenIdx,lTot,true):{ok:0,q:0,scaled:0};
+  const s1=p1Res.scaled,s2=p2Res.scaled,s3=p3Res.scaled;
+  const passTot=(onlyL||one)?Math.round(maxTot*0.48):Math.round(maxTot*(hasL?(80/180):(58/120)));
+  const finalTot=Math.round((s1+s2+s3)*10)/10;
+  const p12Tot=Math.round((s1+s2)*10)/10;
+  const lTotQ=p3Res.q;
+  const lMinOk=hasL?(lTotQ>=10?10:Math.ceil(lTotQ*0.42)):0;
+  const p12Min=(onlyL||one)?0:Math.round(38*(p1Tot+p2Tot)/120);
+  const lMinScore=hasL?Math.round(19*lTot/60):0;
+  const pass=(onlyL||one)?(finalTot>=passTot):(p12Tot>=p12Min&&(!hasL||(s3>=lMinScore&&p3Res.ok>=lMinOk))&&finalTot>=passTot);
+  const statusLabel=pass?'PASS ✓':'FAIL ✕';
+  const shortStatus=pass?'PASS':'FAIL';
+  const totQ=p1Res.q+p2Res.q+p3Res.q;
+  const totOk=p1Res.ok+p2Res.ok+p3Res.ok;
+  return{
+    name:cfg.name,onlyL,one,hasL,
+    p1q:p1Res.q,p2q:p2Res.q,lTotQ,
+    p1:p1Res.ok,p2:p2Res.ok,p3:p3Res.ok,
+    s1,s2,s3,p12Tot,p1Tot,p2Tot,lTot,
+    p12Min,lMinScore,lMinOk,
+    totOk,finalTot,maxTot,passTot,
+    pass,statusLabel,shortStatus,totQ
+  };
+}
+function buildCertCardHtml(meSm,meta){
+  const rModeLbl=meta.onlyListen?`Only Listening (${meSm.maxTot} Marks)`:(meta.onePart?`${meSm.maxTot} Marks`:((meSm.p1Tot===60&&meSm.p2Tot===60&&(!meta.hasListen||meSm.lTot===60))?'Scaled 60/Part':`${meSm.maxTot} Marks`));
+  const lTotQ=meta.lTotQ;
+  const meStatsHtml=meta.onlyListen
+    ?`<div class="stat" style="margin-top:8px"><span>Listening (${meSm.p3}/${lTotQ} টি সঠিক)</span><b>${meSm.s3} / ${meSm.maxTot}</b></div>`
+    :(meta.onePart
+      ?`<div class="stat" style="margin-top:8px"><span>Part 1 (${meSm.p1}/${meta.p1q} টি সঠিক)</span><b>${meSm.s1} / ${meSm.p1Tot}</b></div>
+        ${meta.hasListen?`<div class="stat"><span>Listening (${meSm.p3}/${lTotQ} টি সঠিক)</span><b>${meSm.s3} / ${meSm.lTot}</b></div>`:''}`
+      :`<div class="stat" style="margin-top:8px"><span>Part 1 (${meSm.p1}/${meta.p1q} টি সঠিক)</span><b>${meSm.s1} / ${meSm.p1Tot}</b></div>
+        <div class="stat"><span>Part 2 (${meSm.p2}/${meta.p2q} টি সঠিক)</span><b>${meSm.s2} / ${meSm.p2Tot}</b></div>
+        <div class="stat"><span>Part 1 + Part 2 (Min ${meSm.p12Min})</span><b>${Math.round((meSm.s1+meSm.s2)*10)/10} / ${meSm.p1Tot+meSm.p2Tot} <span style="color:${Math.round((meSm.s1+meSm.s2)*10)/10>=meSm.p12Min?'var(--ok)':'var(--bad)'}">${Math.round((meSm.s1+meSm.s2)*10)/10>=meSm.p12Min?'✓':'✕'}</span></b></div>
+        ${meta.hasListen?(()=>{const lMinOk=lTotQ>=10?10:Math.ceil(lTotQ*0.42),lOk=meSm.s3>=meSm.lMinScore&&meSm.p3>=lMinOk;return `<div class="stat"><span>Listening (${meSm.p3}/${lTotQ} টি সঠিক · Min ${lMinOk} সঠিক & ${meSm.lMinScore})</span><b>${meSm.s3} / ${meSm.lTot} <span style="color:${lOk?'var(--ok)':'var(--bad)'}">${lOk?'✓':'✕'}</span></b></div>`})():''}`);
+  const circleCls=meSm.pass?'':'fail-c';
+  const rankLine=meSm.pass?'PASS':'FAIL';
+  return `<div class="cert-card">
+    <div class="mu" style="letter-spacing:1.6px;font-weight:700;text-transform:uppercase;font-size:11px">Certificate of Achievement · ${esc(rModeLbl)}</div>
+    <h2 style="margin:6px 0 2px;font-size:20px">${esc(meta.examName||'Mock Exam')}</h2>
+    <div style="font-weight:700;font-size:16px">${esc(meSm.name||cfg.name)}</div>
+    <div class="mu">${esc(meta.subLine||'')}</div>
+    <div class="cert-circle ${circleCls}">
+      <div style="font-size:13px;font-weight:700">${rankLine}</div>
+      <div style="font-size:26px;font-weight:800;line-height:1.1;margin:2px 0">${meSm.finalTot}<span style="font-size:14px;font-weight:600;color:var(--mu)">/${meSm.maxTot}</span></div>
+      <div style="font-size:12px;color:var(--mu)">${meSm.totOk}/${meSm.totQ} Qs</div>
+    </div>
+    <div style="margin-bottom:8px"><span class="pill ${meSm.pass?'live':'end'}" style="font-size:13px;padding:4px 12px">${esc(meSm.statusLabel)}</span></div>
+    <div style="text-align:left;border-top:1px solid var(--bd);padding-top:8px">${meStatsHtml}</div>
+    <div class="stat" style="margin-top:4px;border-top:1px solid var(--bd);padding-top:6px"><span>Total (Pass: ${meSm.passTot})</span><b>${meSm.finalTot} / ${meSm.maxTot}</b></div>
+  </div>`;
 }
 function showReport(keepTime){
   stopYt();
@@ -1188,7 +1336,24 @@ function showReport(keepTime){
   if(!keepTime||!repTime)repTime=new Date().toLocaleString();
   saveCurrentExamToHistory();
   $('repName').textContent=(cfg.examName?'Exam Name: '+cfg.examName+' · ':'')+cfg.name+' · '+repTime;
-  let html='<div class="rep-grid">',txt=`Report Card\n${cfg.examName?'Exam Name: '+cfg.examName+'\n':''}Name: ${cfg.name}\nDate: ${repTime}\n`;
+  let html='',txt=`Report Card\n${cfg.examName?'Exam Name: '+cfg.examName+'\n':''}Name: ${cfg.name}\nDate: ${repTime}\n`;
+  lastSoloCertMeta=null;
+  if(cfg.parts.some((_,i)=>markStats(i).has)){
+    const meSm=calcSoloSummary();
+    lastSoloCertMeta={
+      meSm,onlyListen:meSm.onlyL,onePart:meSm.one,hasListen:meSm.hasL,
+      p1q:meSm.p1q,p2q:meSm.p2q,lTotQ:meSm.lTotQ,
+      examName:cfg.examName||'Mock Exam',
+      subLine:`Individual Exam · ${repTime}`
+    };
+    html+=buildCertCardHtml(meSm,lastSoloCertMeta);
+  }
+  const hasCert=!!lastSoloCertMeta;
+  $('imgBtn').classList.toggle('hide',hasCert);
+  $('dlCertBtn').classList.toggle('hide',!hasCert);
+  $('dlSheetBtn').classList.toggle('hide',!hasCert);
+  $('dlBothBtn').classList.toggle('hide',!hasCert);
+  html+='<div class="rep-grid">';
   let totAns=0,totQ=0,totTime=0,totOk=0,totBad=0;
   cfg.parts.forEach((P,i)=>{
     const A=ans[i],{M,ok,bad,has}=markStats(i);
@@ -1239,14 +1404,25 @@ function showReport(keepTime){
   });
   const hasTot=(totOk+totBad)>0,totPct=hasTot?Math.round(totOk*100/totQ):0;
   html+=`</div><div class="card"><div class="stat"><span>Total answered</span><b>${totAns} / ${totQ}</b></div>`;
-  if(hasTot)html+=`<div class="stat"><span>Total score</span><b><span style="color:var(--ok)">✓ ${totOk}</span> / ${totQ} · <span style="color:var(--bad)">✕ ${totBad}</span> (${totPct}%)</b></div>`;
+  if(hasTot){
+    html+=`<div class="stat"><span>Total score</span><b><span style="color:var(--ok)">✓ ${totOk}</span> / ${totQ} · <span style="color:var(--bad)">✕ ${totBad}</span> (${totPct}%)</b></div>`;
+    if(lastSoloCertMeta){
+      const sm=lastSoloCertMeta.meSm;
+      html+=`<div class="stat"><span>Scaled Marks (Pass: ${sm.passTot})</span><b>${sm.finalTot} / ${sm.maxTot} (${sm.shortStatus})</b></div>`;
+    }
+  }
   html+=`<div class="stat"><span>Total time</span><b>${fmt(totTime)}</b></div></div>`;
-  txt+=`\nTotal answered: ${totAns}/${totQ}`+(hasTot?`\nTotal score: ${totOk}/${totQ} (${totPct}%), wrong ${totBad}`:'')+`\nTotal time: ${fmt(totTime)}`;
+  txt+=`\nTotal answered: ${totAns}/${totQ}`+(hasTot?`\nTotal score: ${totOk}/${totQ} (${totPct}%), wrong ${totBad}`:'')+(lastSoloCertMeta?`\nScaled Marks: ${lastSoloCertMeta.meSm.finalTot}/${lastSoloCertMeta.meSm.maxTot} (Pass: ${lastSoloCertMeta.meSm.passTot}) — ${lastSoloCertMeta.meSm.shortStatus}`:'')+`\nTotal time: ${fmt(totTime)}`;
   reportText=txt;$('repBody').innerHTML=html;
   window.scrollTo(0,0);
 }
-function saveReportImage(){
-  const W=920,pad=28,gap=20,colW=(W-pad*2-gap)/2,fullW=W-pad*2,rowH=28,boxTop=88;
+function saveReportImage(mode='sheet'){
+  const wantCert=(mode==='cert'||mode==='both')&&!!lastSoloCertMeta;
+  const wantSheet=(mode==='sheet'||mode==='both');
+  const W=920,pad=28,gap=20,colW=(W-pad*2-gap)/2,fullW=W-pad*2,rowH=28;
+  const certMeta=lastSoloCertMeta;
+  const certH=wantCert?386:0;
+  const boxTop=wantCert?(88+certH+18):88;
   const partH=(P,i)=>{
     const A=ans[i]||[],{M,has}=markStats(i),head=has?94:76;
     if(P.listen){
@@ -1259,31 +1435,77 @@ function saveReportImage(){
   const nParts=cfg.parts.length;
   let totalCardsH=0;
   const layouts=[];
-  if(nParts===1){
-    const h=partH(cfg.parts[0],0);
-    layouts.push({x:pad,y:boxTop,w:fullW,h});
-    totalCardsH=h;
-  }else if(nParts===2){
-    const h=Math.max(partH(cfg.parts[0],0),partH(cfg.parts[1],1));
-    layouts.push({x:pad,y:boxTop,w:colW,h},{x:pad+colW+gap,y:boxTop,w:colW,h});
-    totalCardsH=h;
-  }else{
-    const hTop=Math.max(partH(cfg.parts[0],0),partH(cfg.parts[1],1));
-    const hBot=partH(cfg.parts[2],2);
-    layouts.push({x:pad,y:boxTop,w:colW,h:hTop},{x:pad+colW+gap,y:boxTop,w:colW,h:hTop},{x:pad,y:boxTop+hTop+gap,w:fullW,h:hBot});
-    totalCardsH=hTop+gap+hBot;
+  if(wantSheet){
+    if(nParts===1){
+      const h=partH(cfg.parts[0],0);
+      layouts.push({x:pad,y:boxTop,w:fullW,h});
+      totalCardsH=h;
+    }else if(nParts===2){
+      const h=Math.max(partH(cfg.parts[0],0),partH(cfg.parts[1],1));
+      layouts.push({x:pad,y:boxTop,w:colW,h},{x:pad+colW+gap,y:boxTop,w:colW,h});
+      totalCardsH=h;
+    }else{
+      const hTop=Math.max(partH(cfg.parts[0],0),partH(cfg.parts[1],1));
+      const hBot=partH(cfg.parts[2],2);
+      layouts.push({x:pad,y:boxTop,w:colW,h:hTop},{x:pad+colW+gap,y:boxTop,w:colW,h:hTop},{x:pad,y:boxTop+hTop+gap,w:fullW,h:hBot});
+      totalCardsH=hTop+gap+hBot;
+    }
   }
   const hasAnyMarks=cfg.parts.some((_,i)=>markStats(i).has);
   const footH=hasAnyMarks?66:46;
-  const H=boxTop+totalCardsH+14+footH+pad;
+  const H=wantSheet?(boxTop+totalCardsH+14+footH+pad):(88+certH+pad);
   const dpr=2,c=document.createElement('canvas');c.width=W*dpr;c.height=H*dpr;
   const ctx=c.getContext('2d');ctx.scale(dpr,dpr);
-  ctx.fillStyle='#f4f5f7';ctx.fillRect(0,0,W,H);
+  const dt=document.documentElement.getAttribute('data-theme');
+  const isDark=dt==='dark'||(!dt&&window.matchMedia('(prefers-color-scheme:dark)').matches);
+  ctx.fillStyle=isDark?'#0f172a':'#f4f5f7';ctx.fillRect(0,0,W,H);
   const rrect=(x,y,w,h,r)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r)};
-  ctx.fillStyle='#18181b';ctx.font='bold 24px system-ui,sans-serif';
-  ctx.fillText('Mock Exam — Report Card',pad,42);
+  ctx.fillStyle=isDark?'#f8fafc':'#18181b';ctx.font='bold 24px system-ui,sans-serif';
+  ctx.fillText(mode==='cert'?'Mock Exam — Certificate':'Mock Exam — Report Card',pad,42);
   ctx.fillStyle='#6b7280';ctx.font='15px system-ui,sans-serif';
   ctx.fillText((cfg.examName?'Exam Name: '+cfg.examName+'  ·  ':'')+cfg.name+'  ·  '+repTime,pad,66);
+  if(wantCert){
+    const sm=certMeta.meSm,cy=88;
+    const tierCol=sm.pass?(isDark?'#3b82f6':'#2563eb'):'#dc2626';
+    ctx.fillStyle=isDark?'#1e293b':'#ffffff';ctx.strokeStyle=isDark?'#334155':'#e2e4e9';ctx.lineWidth=2.5;
+    rrect(pad,cy,fullW,certH,18);ctx.fill();ctx.stroke();
+    const ty=cy+32;
+    ctx.textAlign='center';
+    ctx.fillStyle='#6b7280';ctx.font='bold 12px system-ui,sans-serif';
+    ctx.fillText('CERTIFICATE OF ACHIEVEMENT',W/2,ty);
+    ctx.fillStyle=isDark?'#f8fafc':'#18181b';ctx.font='bold 22px system-ui,sans-serif';
+    ctx.fillText(certMeta.examName||cfg.examName||'Mock Exam',W/2,ty+28);
+    ctx.font='bold 16px system-ui,sans-serif';
+    ctx.fillText((sm.name||cfg.name)+' · '+(certMeta.subLine||''),W/2,ty+52);
+    const circY=ty+142;
+    ctx.beginPath();ctx.arc(W/2,circY,72,0,Math.PI*2);
+    ctx.fillStyle=isDark?'#0f172a':'#f8fafc';
+    ctx.fill();ctx.lineWidth=8;ctx.strokeStyle=tierCol;ctx.stroke();
+    ctx.fillStyle=isDark?'#f8fafc':'#18181b';ctx.font='bold 14px system-ui,sans-serif';
+    ctx.fillText(sm.pass?'PASS':'FAIL',W/2,circY-26);
+    ctx.font='bold 30px system-ui,sans-serif';
+    ctx.fillText(`${sm.finalTot}/${sm.maxTot}`,W/2,circY+10);
+    ctx.fillStyle='#6b7280';ctx.font='14px system-ui,sans-serif';
+    ctx.fillText(`${sm.totOk}/${sm.totQ} Qs`,W/2,circY+34);
+    ctx.fillStyle=sm.pass?'#16a34a':'#dc2626';ctx.font='bold 15px system-ui,sans-serif';
+    ctx.fillText(`${sm.statusLabel}  ·  Pass Mark: ${sm.passTot}`,W/2,circY+98);
+    ctx.fillStyle='#6b7280';ctx.font='14px system-ui,sans-serif';
+    const lTotQ=certMeta.lTotQ||0;
+    const partLine=certMeta.onlyListen?`Listening: ${sm.s3}/${sm.maxTot} (${sm.p3}/${lTotQ} Qs)`
+      :(certMeta.onePart?`Part 1: ${sm.s1}/${sm.p1Tot} (${sm.p1}/${certMeta.p1q||0})`+(certMeta.hasListen?`  ·  Listening: ${sm.s3}/${sm.lTot} (${sm.p3}/${lTotQ})`:'')
+      :`Part 1: ${sm.s1}/${sm.p1Tot} (${sm.p1}/${certMeta.p1q||0})  ·  Part 2: ${sm.s2}/${sm.p2Tot} (${sm.p2}/${certMeta.p2q||0})`+(certMeta.hasListen?`  ·  Listening: ${sm.s3}/${sm.lTot} (${sm.p3}/${lTotQ})`:''));
+    ctx.fillText(partLine,W/2,circY+124);
+    ctx.textAlign='left';
+  }
+  if(!wantSheet){
+    c.toBlob(blob=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`certificate_${(cfg.name||'exam').replace(/[^a-z0-9_-]/gi,'_')}.png`;
+      a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    },'image/png');
+    return;
+  }
   let totAns=0,totQ=0,totTime=0,totOk=0,totBad=0;
   cfg.parts.forEach((P,i)=>{
     const {x,y,w,h}=layouts[i],A=ans[i],n=A.filter(Boolean).length,{M,ok,bad,has}=markStats(i);
@@ -1404,6 +1626,7 @@ function buildExamRecord(){
     st:cfg.style||'num',
     p:cfg.parts.map((P,i)=>({
       l:P.label,ls:P.listen?1:0,q:P.q,m:P.m,
+      t:+P.tot>0?+P.tot:undefined,
       mq:P.listen?partMondai(P).map(x=>x.q):undefined,
       u:Math.round(used[i]||0),
       a:packArr(ans[i]||[],P.q,'0'),
@@ -1417,6 +1640,7 @@ function applyExamRecord(rec){
   cfg={name:rec.n||'Student',driveId:'',examName:rec.en||'',ytId:'',style:rec.st||'num',
     parts:rec.p.map(x=>{
       const pt={label:x.l,listen:!!x.ls,pages:[],q:x.q,m:x.m};
+      if(+x.t>0)pt.tot=+x.t;
       if(pt.listen){
         const mds=cloneMondai();
         if(Array.isArray(x.mq)&&x.mq.length===4)mds.forEach((md,k)=>md.q=+x.mq[k]||md.q);
@@ -1667,7 +1891,10 @@ $('copyLinkBtn').onclick=async()=>{
   catch(e){prompt('Copy Review Link:',url)}
 };
 $('newExamBtn').onclick=()=>goHome();
-$('imgBtn').onclick=saveReportImage;
+$('imgBtn').onclick=()=>saveReportImage('sheet');
+$('dlCertBtn').onclick=()=>saveReportImage('cert');
+$('dlSheetBtn').onclick=()=>saveReportImage('sheet');
+$('dlBothBtn').onclick=()=>saveReportImage('both');
 $('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(reportText);$('copyBtn').textContent='Copied ✓'}catch(e){prompt('Copy:',reportText)}};
 $('printBtn').onclick=()=>window.print();
 $('importPngBtn').onclick=()=>$('importPngInput').click();
